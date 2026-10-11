@@ -1,6 +1,6 @@
-# Pac-Man
+# Godzilla Pac-Man
 
-Pac-Man clásico en JavaScript puro, en un solo archivo HTML (canvas, sin dependencias).
+Pac-Man en JavaScript puro con Godzilla como protagonista, en un solo archivo HTML (canvas, sin dependencias).
 
 ## Cómo jugar
 
@@ -15,6 +15,9 @@ Abre `index.html` en el navegador.
 
 - Laberinto clásico de 28 × 31 con túnel lateral
 - Puntos, píldoras de poder y frutas por nivel
-- Cuatro fantasmas con su comportamiento original (Blinky, Pinky, Inky y Clyde), con modos de dispersión y persecución
+- Cuatro kaijus enemigos con la inteligencia de los fantasmas originales: Ghidorah (persigue), Mothra (te corta el paso), Mechagodzilla y Rodan
+- Con las píldoras de poder, las placas de Godzilla brillan con el aliento atómico y los kaijus se asustan
+
+Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 - Puntuación, vidas, vida extra a los 10 000 puntos y récord guardado en el navegador
 - Niveles cada vez más rápidos

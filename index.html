@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pac-Man</title>
+<title>Godzilla Pac-Man</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
@@ -97,7 +97,7 @@
 </style>
 </head>
 <body>
-<div id="stage"><canvas id="game" aria-label="Tablero de Pac-Man"></canvas></div>
+<div id="stage"><canvas id="game" aria-label="Tablero de Godzilla Pac-Man"></canvas></div>
 <div class="bar">
   <div class="dpad" aria-label="Cruceta">
     <button data-dir="up" aria-label="Arriba">▲</button>
@@ -177,7 +177,7 @@
     { name: "llave", pts: 5000, col: "#b9e6ff" },
   ];
   const FONT = '"Press Start 2P", ui-monospace, Menlo, monospace';
-  const COL = { wall: "#2b3cff", wallFlash: "#f2f3ff", bg: "#04050c", dot: "#ffc6b5", pac: "#ffd23f", door: "#ffb8de", fright: "#2a2dff", frightFace: "#ffcfa8", text: "#e9eaff", red: "#ff3b3b", cyan: "#4ff3ff" };
+  const COL = { wall: "#2b3cff", wallFlash: "#f2f3ff", bg: "#04050c", dot: "#ffc6b5", pac: "#ffd23f", door: "#ffb8de", fright: "#2a2dff", frightFace: "#ffcfa8", text: "#e9eaff", red: "#ff3b3b", cyan: "#4ff3ff", power: "#56e0ff" };
 
   // ---------- Lienzo ----------
   const stage = document.getElementById("stage");
@@ -527,39 +527,159 @@
     ctx.restore();
   }
 
-  function drawPac(x, y, dir, open, r = 0.62) {
-    const a = angleOf(dir);
-    ctx.fillStyle = COL.pac;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.arc(x, y, r, a + open, a + Math.PI * 2 - open);
-    ctx.closePath();
-    ctx.fill();
+  // ---------- Godzilla ----------
+  const GZ = { body: "#3f9a49", dark: "#235c2c", belly: "#b4d98a", spine: "#e3efc9" };
+  const ell = (x, y, rx, ry, rot = 0) => { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); ctx.fill(); };
+  const tri = (a, b, c) => { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.closePath(); ctx.fill(); };
+  const rot = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+
+  // Sprite mirando a la derecha, centrado en (0,0), cabe en ~1.3 casillas.
+  function godzillaSprite(jaw, glow) {
+    // Cola
+    ctx.fillStyle = GZ.dark;
+    ctx.beginPath(); ctx.moveTo(-0.2, 0.02); ctx.quadraticCurveTo(-0.55, 0.08, -0.72, 0.44); ctx.quadraticCurveTo(-0.45, 0.32, -0.1, 0.36); ctx.closePath(); ctx.fill();
+    // Placas dorsales (brillan en azul con el aliento atómico)
+    ctx.fillStyle = glow ? "#8ff6ff" : GZ.spine;
+    if (glow) { ctx.shadowColor = "#3fd0ff"; ctx.shadowBlur = S * 0.45; }
+    for (const [x, y, h] of [[-0.42, -0.06, 0.2], [-0.24, -0.22, 0.26], [-0.04, -0.3, 0.22]]) tri([x - 0.1, y + 0.06], [x - 0.05, y - h], [x + 0.1, y + 0.04]);
+    ctx.shadowBlur = 0;
+    // Patas
+    ctx.fillStyle = GZ.dark;
+    ctx.fillRect(-0.3, 0.3, 0.17, 0.26); ctx.fillRect(0.0, 0.3, 0.17, 0.26);
+    // Cuerpo y barriga
+    ctx.fillStyle = GZ.body; ell(-0.08, 0.08, 0.4, 0.36);
+    ctx.fillStyle = GZ.belly; ell(0.1, 0.16, 0.17, 0.22);
+    // Brazo
+    ctx.strokeStyle = GZ.dark; ctx.lineWidth = 0.09; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0.14, 0.04); ctx.lineTo(0.32, 0.15); ctx.stroke();
+    // Cabeza con mandíbula articulada
+    ctx.save();
+    ctx.translate(0.16, -0.2);
+    const up = -jaw * 0.35, lo = jaw;
+    const ut = rot(0.42, 0.02, up), lt = rot(0.4, 0.04, lo);
+    ctx.fillStyle = "#7a1020"; tri([0, 0.04], ut, lt);
+    if (glow) { ctx.fillStyle = "rgba(127,243,255,0.85)"; tri([0.1, 0.04], ut, lt); }
+    ctx.save(); ctx.rotate(lo);
+    ctx.fillStyle = GZ.body;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0.4, 0.03); ctx.lineTo(0.35, 0.13); ctx.lineTo(0, 0.15); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    for (let i = 0; i < 3; i++) tri([0.16 + i * 0.08, 0.02], [0.2 + i * 0.08, -0.04], [0.24 + i * 0.08, 0.02]);
+    ctx.restore();
+    ctx.save(); ctx.rotate(up);
+    ctx.fillStyle = GZ.body;
+    ctx.beginPath(); ctx.moveTo(-0.06, 0.04); ctx.lineTo(-0.03, -0.17); ctx.quadraticCurveTo(0.2, -0.27, 0.45, -0.08); ctx.lineTo(0.44, 0.03); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    for (let i = 0; i < 3; i++) tri([0.16 + i * 0.08, 0.02], [0.2 + i * 0.08, 0.08], [0.24 + i * 0.08, 0.02]);
+    ctx.fillStyle = GZ.dark; ctx.fillRect(0.08, -0.17, 0.16, 0.035);
+    ctx.fillStyle = "#ffde3a"; ell(0.18, -0.1, 0.055, 0.05);
+    ctx.fillStyle = "#111"; ell(0.2, -0.1, 0.028, 0.035);
+    ctx.restore();
+    ctx.restore();
   }
 
-  function drawGhostBody(x, y, color, dir, frightened, flashing, eyesOnly) {
-    const r = 0.64;
+  // Se llama como el viejo Pac-Man: open va de 0 a ~0.25π
+  function drawPac(x, y, dir, open, r = 0.62, glow = false) {
+    const s = r / 0.62;
+    ctx.save();
+    ctx.translate(x, y);
+    if (dir === LEFT) ctx.scale(-s, s);
+    else { ctx.scale(s, s); ctx.rotate(dir === DOWN ? Math.PI / 2 : dir === UP ? -Math.PI / 2 : 0); }
+    godzillaSprite(Math.min(1, open / (0.25 * Math.PI)) * 0.5, glow);
+    ctx.restore();
+  }
+
+  function drawGodzillaDeath(x, y, t) {
+    const k = Math.max(0, 1 - t / 1.2);
+    if (k <= 0) return;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(t * 7);
+    ctx.scale(k, k);
+    ctx.globalAlpha = 0.4 + 0.6 * k;
+    godzillaSprite(0.5, false);
+    ctx.restore();
+  }
+
+  // ---------- Kaijus enemigos ----------
+  const KAIJU = {
+    blinky: { label: "GHIDORAH", main: "#f2b632", dark: "#a8741a", light: "#ffe38a", eye: "#ff2b2b" },
+    pinky: { label: "MOTHRA", main: "#ff8a3d", dark: "#6e3412", light: "#ffd23f", eye: "#3fb7ff" },
+    inky: { label: "MECHAGODZILLA", main: "#b4bfcf", dark: "#5d6878", light: "#eef2f8", eye: "#ffd23f" },
+    clyde: { label: "RODAN", main: "#c94a2e", dark: "#6e2216", light: "#f2a170", eye: "#ffd23f" },
+  };
+  const SCARED = { main: "#2a2dff", dark: "#1718a0", light: "#7376ff", eye: "#ffcfa8" };
+  const SCARED_FLASH = { main: "#f4f4ff", dark: "#c3c3e0", light: "#ffffff", eye: "#ff3b3b" };
+
+  function kaijuSprite(name, p, dir) {
+    const flap = Math.sin(clock * 12);
+    const lx = dir.x * 0.03, ly = dir.y * 0.03;
+    if (name === "blinky") { // King Ghidorah: tres cabezas, alas doradas
+      ctx.fillStyle = p.dark;
+      tri([-0.12, 0], [-0.72, -0.32 + flap * 0.14], [-0.5, 0.32]);
+      tri([0.12, 0], [0.72, -0.32 + flap * 0.14], [0.5, 0.32]);
+      ctx.strokeStyle = p.dark; ctx.lineWidth = 0.08; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-0.1, 0.36); ctx.lineTo(-0.3, 0.6); ctx.moveTo(0.1, 0.36); ctx.lineTo(0.3, 0.6); ctx.stroke();
+      ctx.fillStyle = p.main; ell(0, 0.14, 0.28, 0.33);
+      ctx.strokeStyle = p.main; ctx.lineWidth = 0.13;
+      const heads = [[-0.36, -0.42], [0, -0.54], [0.36, -0.42]];
+      ctx.beginPath(); for (const [hx, hy] of heads) { ctx.moveTo(0, -0.04); ctx.lineTo(hx, hy); } ctx.stroke();
+      for (const [hx, hy] of heads) {
+        ctx.fillStyle = p.light; tri([hx - 0.08, hy - 0.06], [hx, hy - 0.2], [hx + 0.08, hy - 0.06]);
+        ctx.fillStyle = p.main; ell(hx, hy, 0.13, 0.1);
+        ctx.fillStyle = p.eye; ell(hx + lx * 1.5, hy - 0.01 + ly, 0.04, 0.035);
+      }
+    } else if (name === "pinky") { // Mothra: alas grandes con ocelos
+      const fy = 0.75 + 0.25 * Math.abs(flap);
+      ctx.fillStyle = p.main; ell(-0.36, -0.12, 0.33, 0.27 * fy, -0.3); ell(0.36, -0.12, 0.33, 0.27 * fy, 0.3);
+      ctx.fillStyle = p.light; ell(-0.27, 0.24, 0.21, 0.17 * fy, 0.4); ell(0.27, 0.24, 0.21, 0.17 * fy, -0.4);
+      ctx.fillStyle = p.light; ell(-0.42, -0.14, 0.1, 0.1 * fy); ell(0.42, -0.14, 0.1, 0.1 * fy);
+      ctx.fillStyle = p.dark; ell(-0.42, -0.14, 0.05, 0.05 * fy); ell(0.42, -0.14, 0.05, 0.05 * fy);
+      ctx.fillStyle = p.dark; ell(0, 0.06, 0.1, 0.38);
+      ell(0, -0.32, 0.12, 0.12);
+      ctx.strokeStyle = p.dark; ctx.lineWidth = 0.04;
+      ctx.beginPath(); ctx.moveTo(-0.05, -0.42); ctx.quadraticCurveTo(-0.1, -0.6, -0.2, -0.62); ctx.moveTo(0.05, -0.42); ctx.quadraticCurveTo(0.1, -0.6, 0.2, -0.62); ctx.stroke();
+      ctx.fillStyle = p.eye; ell(-0.06 + lx, -0.33 + ly, 0.045, 0.045); ell(0.06 + lx, -0.33 + ly, 0.045, 0.045);
+    } else if (name === "inky") { // Mechagodzilla: blindado, visor y núcleo
+      ctx.fillStyle = p.dark;
+      tri([-0.36, -0.12], [-0.28, -0.4], [-0.18, -0.12]); tri([0.18, -0.12], [0.28, -0.4], [0.36, -0.12]);
+      ctx.fillRect(-0.28, 0.36, 0.18, 0.22); ctx.fillRect(0.1, 0.36, 0.18, 0.22);
+      ctx.fillStyle = p.main;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-0.34, -0.16, 0.68, 0.6, 0.12) : ctx.rect(-0.34, -0.16, 0.68, 0.6); ctx.fill();
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-0.22, -0.6, 0.44, 0.38, 0.08) : ctx.rect(-0.22, -0.6, 0.44, 0.38); ctx.fill();
+      ctx.fillStyle = p.dark; ctx.fillRect(-0.18, -0.47, 0.36, 0.11);
+      ctx.fillRect(-0.34, 0.12, 0.68, 0.04);
+      ctx.fillStyle = p.eye; ctx.fillRect(-0.15 + lx * 1.5, -0.45, 0.1, 0.07); ctx.fillRect(0.05 + lx * 1.5, -0.45, 0.1, 0.07);
+      ctx.fillStyle = p === KAIJU.inky ? "#4ff3ff" : p.light; ell(0, -0.0, 0.09, 0.09);
+      ctx.fillStyle = p.light; ctx.fillRect(-0.16, -0.58, 0.32, 0.04);
+    } else { // Rodan: pterosaurio de alas anchas y cresta
+      const fw = flap * 0.12;
+      ctx.fillStyle = p.main;
+      ctx.beginPath(); ctx.moveTo(-0.1, -0.08); ctx.lineTo(-0.72, -0.34 + fw); ctx.lineTo(-0.62, 0.06); ctx.lineTo(-0.42, 0.0); ctx.lineTo(-0.36, 0.2); ctx.lineTo(-0.08, 0.16); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0.1, -0.08); ctx.lineTo(0.72, -0.34 + fw); ctx.lineTo(0.62, 0.06); ctx.lineTo(0.42, 0.0); ctx.lineTo(0.36, 0.2); ctx.lineTo(0.08, 0.16); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = p.dark; ctx.lineWidth = 0.05;
+      ctx.beginPath(); ctx.moveTo(-0.1, -0.08); ctx.lineTo(-0.72, -0.34 + fw); ctx.moveTo(0.1, -0.08); ctx.lineTo(0.72, -0.34 + fw); ctx.stroke();
+      ctx.fillStyle = p.dark; ell(0, 0.12, 0.17, 0.34);
+      ctx.fillStyle = p.light; ell(0, 0.18, 0.08, 0.2);
+      ctx.fillStyle = p.main; ell(0, -0.3, 0.15, 0.13);
+      ctx.fillStyle = p.dark; tri([-0.07, -0.38], [0, -0.66], [0.07, -0.38]);
+      const bs = dir.x < 0 ? -1 : 1;
+      ctx.fillStyle = p.light; tri([0.05 * bs, -0.34], [0.36 * bs, -0.26], [0.05 * bs, -0.22]);
+      ctx.fillStyle = p.eye; ell(-0.06 + lx, -0.32 + ly, 0.04, 0.04); ell(0.06 + lx, -0.32 + ly, 0.04, 0.04);
+    }
+  }
+
+  function drawGhostBody(x, y, name, dir, frightened, flashing, eyesOnly) {
     ctx.save();
     ctx.translate(x, y);
     if (!eyesOnly) {
-      ctx.fillStyle = frightened ? (flashing ? "#f4f4ff" : COL.fright) : color;
-      ctx.beginPath();
-      ctx.arc(0, -0.06, r, Math.PI, 0);
-      const base = r * 0.92, phase = Math.floor(clock * 8) % 2, n = 6, w = (2 * r) / n;
-      ctx.lineTo(r, base);
-      for (let i = 1; i <= n; i++) ctx.lineTo(r - i * w, (i + phase) % 2 ? base - 0.2 : base);
-      ctx.closePath();
-      ctx.fill();
-    }
-    if (frightened && !eyesOnly) {
-      const face = flashing ? COL.red : COL.frightFace;
-      ctx.fillStyle = face;
-      ctx.fillRect(-0.28, -0.24, 0.14, 0.14);
-      ctx.fillRect(0.14, -0.24, 0.14, 0.14);
-      ctx.strokeStyle = face; ctx.lineWidth = 0.07;
-      ctx.beginPath();
-      for (let i = 0; i <= 6; i++) ctx.lineTo(-0.36 + i * 0.12, 0.22 + (i % 2 ? -0.07 : 0.03));
-      ctx.stroke();
+      kaijuSprite(name, frightened ? (flashing ? SCARED_FLASH : SCARED) : KAIJU[name], dir);
+      if (frightened) {
+        const face = flashing ? COL.red : COL.frightFace;
+        ctx.strokeStyle = face; ctx.lineWidth = 0.06;
+        ctx.beginPath();
+        for (let i = 0; i <= 6; i++) ctx.lineTo(-0.27 + i * 0.09, 0.3 + (i % 2 ? -0.06 : 0.02));
+        ctx.stroke();
+      }
     } else {
       for (const s of [-1, 1]) {
         ctx.fillStyle = "#ffffff";
@@ -616,7 +736,7 @@
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
       const c = grid[y][x];
       if (c === ".") ctx.fillRect(x + 0.4, y + TOP + 0.4, 0.2, 0.2);
-      else if (c === "o" && blink) { ctx.beginPath(); ctx.arc(x + 0.5, y + TOP + 0.5, 0.38, 0, Math.PI * 2); ctx.fill(); }
+      else if (c === "o" && blink) { ctx.fillStyle = COL.power; ctx.beginPath(); ctx.arc(x + 0.5, y + TOP + 0.5, 0.38, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = COL.dot; }
     }
 
     if (fruit) drawFruit(fruit.f, fruit.x + 0.5, fruit.y + TOP + 0.5);
@@ -627,17 +747,18 @@
       const flashing = frightT > 0 && frightT < 2 && Math.floor(clock * 6) % 2 === 0;
       for (const g of ghosts) {
         const eyes = g.state === "eaten" || g.state === "entering";
-        drawGhostBody(g.x + 0.5, g.y + TOP + 0.5, g.color, g.dir, g.fright && !eyes, flashing, eyes);
+        drawGhostBody(g.x + 0.5, g.y + TOP + 0.5, g.name, g.dir, g.fright && !eyes, flashing, eyes);
       }
     }
 
     // Pac-Man
     if (state === "dying") {
       const t = Math.max(0, stateT - 0.6);
-      if (t < 1.2) drawPac(pac.x + 0.5, pac.y + TOP + 0.5, UP, 0.2 * Math.PI + (t / 1.2) * 0.8 * Math.PI);
+      if (stateT < 0.6) drawPac(pac.x + 0.5, pac.y + TOP + 0.5, pac.dir, 0.2 * Math.PI);
+      else drawGodzillaDeath(pac.x + 0.5, pac.y + TOP + 0.5, t);
     } else if (state !== "title" && state !== "gameover" && freezeT <= 0) {
       const open = state === "ready" ? 0.2 * Math.PI : (0.03 + 0.22 * Math.abs(Math.sin(pac.mouth))) * Math.PI;
-      drawPac(pac.x + 0.5, pac.y + TOP + 0.5, pac.dir, open);
+      drawPac(pac.x + 0.5, pac.y + TOP + 0.5, pac.dir, open, 0.62, frightT > 0);
     }
 
     for (const p of popups) text(p.text, p.x + 0.5, p.y + TOP + 0.5, 0.55, p.color);
@@ -675,18 +796,18 @@
   function drawTitle() {
     ctx.fillStyle = "rgba(4,5,12,0.82)";
     ctx.fillRect(0, TOP, COLS, ROWS);
-    text("PAC-MAN", 14, 6 + TOP, 1.6, COL.pac);
-    drawPac(14 + Math.sin(clock * 2) * 4, 8.7 + TOP, Math.cos(clock * 2) > 0 ? RIGHT : LEFT, (0.03 + 0.22 * Math.abs(Math.sin(clock * 10))) * Math.PI);
-    const roster = [["BLINKY", "#ff2b2b"], ["PINKY", "#ffb8de"], ["INKY", "#38f0ff"], ["CLYDE", "#ffb347"]];
-    roster.forEach(([n, c], i) => {
+    text("GODZILLA", 14, 5.4 + TOP, 1.6, "#5fd36b");
+    text("CONTRA LOS KAIJUS", 14, 7 + TOP, 0.55, COL.cyan);
+    drawPac(14 + Math.sin(clock * 2) * 4, 9 + TOP, Math.cos(clock * 2) > 0 ? RIGHT : LEFT, (0.03 + 0.22 * Math.abs(Math.sin(clock * 10))) * Math.PI);
+    ["blinky", "pinky", "inky", "clyde"].forEach((n, i) => {
       const y = 11.5 + i * 1.8 + TOP;
-      drawGhostBody(9, y, c, RIGHT, false, false, false);
-      text(n, 11, y + 0.05, 0.6, c, "left");
+      drawGhostBody(8, y, n, RIGHT, false, false, false);
+      text(KAIJU[n].label, 10, y + 0.05, 0.6, KAIJU[n].main, "left");
     });
     ctx.fillStyle = COL.dot;
-    ctx.fillRect(9.4 - 0.5, 19.4 + TOP, 0.2, 0.2);
+    ctx.fillRect(8.9, 19.4 + TOP, 0.2, 0.2);
     text("10 PTS", 11, 19.5 + TOP, 0.5, COL.text, "left");
-    ctx.beginPath(); ctx.arc(9, 20.9 + TOP, 0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = COL.power; ctx.beginPath(); ctx.arc(9, 20.9 + TOP, 0.35, 0, Math.PI * 2); ctx.fill();
     text("50 PTS", 11, 20.9 + TOP, 0.5, COL.text, "left");
     if (Math.floor(clock * 2) % 2 === 0) text(coarse ? "TOCA PARA JUGAR" : "PULSA ESPACIO", 14, 24 + TOP, 0.65, COL.text);
   }
@@ -809,7 +930,7 @@
   requestAnimationFrame(frame);
 
   // Gancho de prueba (no afecta al juego)
-  window.__pacman = { get state() { return state; }, get score() { return score; }, get pac() { return pac; }, get ghosts() { return ghosts; }, get dotsLeft() { return dotsLeft; } };
+  window.__pacman = { get state() { return state; }, get score() { return score; }, get pac() { return pac; }, get ghosts() { return ghosts; }, get dotsLeft() { return dotsLeft; }, energize: () => energize() };
 })();
 </script>
 </body>
