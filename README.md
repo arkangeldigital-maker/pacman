@@ -21,7 +21,7 @@ Pensado para niñas y niños de unos 5 años: no se puede perder y la voz del na
 - **Toca el suelo** (o haz clic) para caminar · también **flechas** o **WASD** · **Espacio** o el botón rojo para saltar · **M** música
 - Misiones: recoger 10 estrellas, encontrar a Rex, Hamm, Slinky, Forky y Lilypad (te siguen en fila) y explotar 10 globos; al final, fiesta con todos
 - Una flecha amarilla en el suelo señala siempre lo que falta; la pelota se puede patear
-- Gráficos 3D con [Three.js](https://threejs.org/) r160 (MIT), incluido en `toystory/three.module.min.js`. Los personajes son versiones propias hechas con figuras simples y la música es original, compuesta con Web Audio (no es la banda sonora de la película)
+- Gráficos 3D con [Three.js](https://threejs.org/) r160 (MIT), incluido en `toystory/three.module.min.js`. Los personajes (en `toystory/personajes.js`) son versiones propias modeladas con formas 3D, con las caras, proporciones y trajes de cada uno y la música es original, compuesta con Web Audio (no es la banda sonora de la película)
 
 ## Godzilla: Choque de Titanes
 

@@ -111,6 +111,7 @@
 
 <script type="module">
 import * as THREE from './three.module.min.js';
+import { canvasTex, M, mk, pivot, sphere, cyl, box, cone, starGeo, goldM, makeWoody, makeBuzz, makeJessie, makeRex, makeHamm, makeSlinky, makeForky, makeLilypad } from './personajes.js';
 
 const $ = (id) => document.getElementById(id);
 const V3 = THREE.Vector3;
@@ -160,41 +161,6 @@ function addLights(sc, shadows) {
 addLights(scene, true);
 
 /* ---------- Texturas dibujadas con canvas ---------- */
-function canvasTex(w, h, draw, repeat) {
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  draw(c.getContext('2d'), w, h);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); }
-  return t;
-}
-function blob(g, x, y, r) {
-  g.beginPath();
-  for (let i = 0; i <= 12; i++) {
-    const a = i / 12 * TAU, rr = r * (0.75 + 0.25 * Math.sin(i * 2.7 + x));
-    const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr * 0.8;
-    i ? g.lineTo(px, py) : g.moveTo(px, py);
-  }
-  g.fill();
-}
-const plaidTex = canvasTex(128, 128, (g, w, h) => {
-  g.fillStyle = '#f4c531'; g.fillRect(0, 0, w, h);
-  g.globalAlpha = 0.55; g.fillStyle = '#d9541f';
-  for (let i = 0; i < 4; i++) { g.fillRect(i * 32 + 4, 0, 6, h); g.fillRect(0, i * 32 + 4, w, 6); }
-  g.globalAlpha = 0.35; g.fillStyle = '#a32a1a';
-  for (let i = 0; i < 4; i++) { g.fillRect(i * 32 + 20, 0, 3, h); g.fillRect(0, i * 32 + 20, w, 3); }
-}, [3, 2]);
-function cowTex(spot) {
-  return canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#fbfaf4'; g.fillRect(0, 0, w, h);
-    g.fillStyle = spot;
-    [[40, 50, 28], [150, 30, 22], [210, 120, 30], [90, 150, 26], [30, 220, 20], [170, 220, 24], [120, 90, 14]].forEach(([x, y, r]) => blob(g, x, y, r));
-  }, [2, 1]);
-}
-const cowBlack = cowTex('#1f1a17');
-const cowBrown = cowTex('#6b3a1e');
 const floorTex = canvasTex(512, 512, (g, w, h) => {
   const ph = 64;
   for (let row = 0; row < 8; row++) {
@@ -246,18 +212,6 @@ const ballTex = canvasTex(512, 256, (g, w, h) => {
   };
   g.fillStyle = '#e23b2e'; star(128, 60, 38, 16); star(384, 196, 38, 16);
 });
-const frogScreenTex = canvasTex(256, 320, (g, w, h) => {
-  const grd = g.createLinearGradient(0, 0, 0, h);
-  grd.addColorStop(0, '#1d5c34'); grd.addColorStop(1, '#0d2e1a');
-  g.fillStyle = grd; g.fillRect(0, 0, w, h);
-  g.fillStyle = '#ff8fb1'; g.globalAlpha = .7;
-  g.beginPath(); g.arc(60, 150, 24, 0, TAU); g.fill();
-  g.beginPath(); g.arc(196, 150, 24, 0, TAU); g.fill();
-  g.globalAlpha = 1; g.strokeStyle = '#ffffff'; g.lineWidth = 16; g.lineCap = 'round';
-  g.beginPath(); g.arc(128, 120, 64, 0.25 * Math.PI, 0.75 * Math.PI); g.stroke();
-  const icons = ['#ffd23f', '#5ec4f2', '#ff6b5e', '#9b7ad8'];
-  icons.forEach((c, i) => { g.fillStyle = c; g.beginPath(); g.roundRect(26 + i * 54, 248, 42, 42, 10); g.fill(); });
-});
 function letterTex(letter, bg, fg) {
   return canvasTex(128, 128, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
@@ -265,368 +219,6 @@ function letterTex(letter, bg, fg) {
     g.fillStyle = fg; g.font = '900 86px Nunito, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(letter, w / 2, h / 2 + 6);
   });
-}
-
-/* ---------- Materiales y piezas ---------- */
-const matCache = new Map();
-function M(color, o = {}) {
-  const key = color + JSON.stringify(o);
-  if (!matCache.has(key)) matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0, ...o }));
-  return matCache.get(key);
-}
-const texM = (map, o = {}) => new THREE.MeshStandardMaterial({ map, roughness: 0.75, ...o });
-const sphere = (r, w = 24, h = 16) => new THREE.SphereGeometry(r, w, h);
-const cyl = (rt, rb, h, s = 20) => new THREE.CylinderGeometry(rt, rb, h, s);
-const box = (x, y, z) => new THREE.BoxGeometry(x, y, z);
-const cone = (r, h, s = 16) => new THREE.ConeGeometry(r, h, s);
-function mk(geo, mat, parent, x = 0, y = 0, z = 0) {
-  const m = new THREE.Mesh(geo, mat);
-  m.position.set(x, y, z);
-  m.castShadow = true; m.receiveShadow = true;
-  if (parent) parent.add(m);
-  return m;
-}
-function pivot(parent, x, y, z) {
-  const p = new THREE.Group();
-  p.position.set(x, y, z);
-  parent.add(p);
-  return p;
-}
-function starShape(R = 0.5, r = 0.22) {
-  const s = new THREE.Shape();
-  for (let i = 0; i < 10; i++) {
-    const a = i / 10 * TAU + Math.PI / 2, rr = i % 2 ? r : R;
-    i ? s.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : s.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
-  }
-  s.closePath();
-  return s;
-}
-const starGeo = new THREE.ExtrudeGeometry(starShape(), { depth: 0.16, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.05, bevelSegments: 2 });
-starGeo.center();
-const goldM = M(0xffcc33, { metalness: 0.45, roughness: 0.3, emissive: 0xff9900, emissiveIntensity: 0.35 });
-
-function eye(parent, x, y, z, r = 0.085, iris = 0x4a2c16) {
-  const g = pivot(parent, x, y, z);
-  mk(sphere(r, 20, 14), M(0xffffff, { roughness: 0.2 }), g);
-  mk(sphere(r * 0.6, 16, 12), M(iris, { roughness: 0.25 }), g, 0, 0, r * 0.55);
-  mk(sphere(r * 0.32, 12, 10), M(0x111111, { roughness: 0.2 }), g, 0, 0, r * 0.82);
-  mk(sphere(r * 0.16, 8, 6), M(0xffffff, { emissive: 0xffffff, emissiveIntensity: 0.8 }), g, r * 0.22, r * 0.25, r * 0.98);
-  return g;
-}
-function smile(parent, x, y, z, r = 0.09, tube = 0.018, color = 0x7a2418) {
-  const m = mk(new THREE.TorusGeometry(r, tube, 8, 20, Math.PI), M(color), parent, x, y, z);
-  m.rotation.z = Math.PI;
-  return m;
-}
-function rig(name) {
-  const root = new THREE.Group();
-  const body = new THREE.Group();
-  root.add(body);
-  return { name, root, body, legs: [], arms: [], head: null, h: 2.6, phase: 0, cheer: 0, stepRate: 9, reach: 1.0 };
-}
-function arm(R, parent, s, x, y, z, sleeveM, handM, len = 0.7, r = 0.095, spread = 0.13) {
-  const a = pivot(parent, s * x, y, z);
-  mk(cyl(r, r * 0.88, len), sleeveM, a, 0, -len / 2, 0);
-  mk(sphere(r * 1.15), handM, a, 0, -len - 0.04, 0);
-  a.rotation.z = a.userData.bz = s * spread;
-  R.arms.push(a);
-  return a;
-}
-
-/* ---------- Personajes (versiones propias, hechas con figuras simples) ---------- */
-function makeWoody() {
-  const R = rig('Woody');
-  const b = R.body;
-  const jeans = M(0x3566b5), boot = M(0x6e3b1c), skin = M(0xf3c59c), hair = M(0x6b3a1a), hatM = M(0x9a6331), red = M(0xd8342c);
-  for (const s of [-1, 1]) {
-    const leg = pivot(b, s * 0.17, 1.15, 0);
-    mk(cyl(0.135, 0.125, 0.9), jeans, leg, 0, -0.45, 0);
-    mk(cyl(0.155, 0.16, 0.34), boot, leg, 0, -0.93, 0);
-    mk(box(0.25, 0.12, 0.42), boot, leg, 0, -1.08, 0.07);
-    R.legs.push(leg);
-  }
-  mk(cyl(0.3, 0.29, 0.22), jeans, b, 0, 1.13, 0);
-  mk(cyl(0.31, 0.3, 0.12), M(0x5a3214), b, 0, 1.24, 0);
-  mk(box(0.16, 0.11, 0.05), M(0xf2c84b, { metalness: 0.6, roughness: 0.3 }), b, 0, 1.24, 0.31);
-  mk(cyl(0.3, 0.29, 0.78), texM(plaidTex), b, 0, 1.66, 0);
-  mk(new THREE.CylinderGeometry(0.318, 0.305, 0.6, 24, 1, true, 0.55, TAU - 1.1), texM(cowBlack, { side: THREE.DoubleSide }), b, 0, 1.72, 0);
-  const badge = mk(starGeo, goldM, b, 0.2, 1.8, 0.26);
-  badge.scale.setScalar(0.17); badge.rotation.y = 0.6;
-  mk(cyl(0.09, 0.1, 0.16), skin, b, 0, 2.08, 0);
-  mk(cyl(0.15, 0.2, 0.08), red, b, 0, 2.03, 0);
-  const tri = mk(cone(0.1, 0.18, 3), red, b, 0, 1.94, 0.16);
-  tri.rotation.x = Math.PI;
-  for (const s of [-1, 1]) arm(R, b, s, 0.4, 1.95, 0, texM(plaidTex), skin, 0.72);
-  const head = R.head = pivot(b, 0, 2.44, 0);
-  mk(sphere(0.34), skin, head).scale.set(1, 1.12, 0.98);
-  mk(sphere(0.35), hair, head, 0, 0.1, -0.1).scale.set(1.02, 1.05, 0.95);
-  for (const s of [-1, 1]) {
-    mk(sphere(0.07), skin, head, s * 0.34, 0, 0);
-    eye(head, s * 0.12, 0.06, 0.29, 0.085);
-    const brow = mk(box(0.13, 0.035, 0.04), hair, head, s * 0.12, 0.19, 0.3);
-    brow.rotation.z = -s * 0.18;
-  }
-  mk(sphere(0.06), skin, head, 0, -0.04, 0.34);
-  smile(head, 0, -0.15, 0.3, 0.1, 0.02);
-  const hat = pivot(head, 0, 0.34, -0.02);
-  hat.rotation.x = -0.1;
-  mk(cyl(0.62, 0.62, 0.04, 32), hatM, hat);
-  mk(cyl(0.27, 0.33, 0.36), hatM, hat, 0, 0.2, 0);
-  mk(cyl(0.336, 0.336, 0.07), M(0x4a2a12), hat, 0, 0.05, 0);
-  R.h = 3.0;
-  return R;
-}
-
-function makeBuzz() {
-  const R = rig('Buzz');
-  const b = R.body;
-  const white = M(0xf3f4f0, { roughness: 0.35 }), green = M(0x6cc04a, { roughness: 0.4 }), purple = M(0x7b4fc0, { roughness: 0.4 });
-  const lav = M(0x9b7ad8), skin = M(0xf0c29a), gray = M(0xb9c1ca, { metalness: 0.3, roughness: 0.35 });
-  for (const s of [-1, 1]) {
-    const leg = pivot(b, s * 0.2, 1.15, 0);
-    mk(cyl(0.16, 0.14, 0.9), white, leg, 0, -0.45, 0);
-    mk(cyl(0.168, 0.165, 0.26), green, leg, 0, -0.2, 0);
-    mk(box(0.3, 0.24, 0.46), white, leg, 0, -0.98, 0.06);
-    mk(box(0.31, 0.06, 0.47), purple, leg, 0, -1.11, 0.06);
-    R.legs.push(leg);
-  }
-  mk(box(0.64, 0.24, 0.44), purple, b, 0, 1.16, 0);
-  mk(box(0.76, 0.74, 0.5), white, b, 0, 1.63, 0);
-  mk(box(0.78, 0.26, 0.52), green, b, 0, 1.88, 0);
-  mk(box(0.36, 0.24, 0.06), gray, b, 0, 1.58, 0.27);
-  [0xe23b2e, 0x3fae49, 0x2f64c9].forEach((c, i) => mk(sphere(0.035, 10, 8), M(c, { emissive: c, emissiveIntensity: 0.4 }), b, -0.09 + i * 0.09, 1.58, 0.3));
-  mk(box(0.56, 0.5, 0.2), white, b, 0, 1.75, -0.32);
-  for (const s of [-1, 1]) {
-    const wing = pivot(b, s * 0.25, 1.8, -0.38);
-    wing.rotation.set(0, s * 0.25, s * 0.28);
-    mk(box(0.9, 0.05, 0.3), white, wing, s * 0.45, 0, 0);
-    mk(box(0.14, 0.055, 0.3), M(0xe23b2e), wing, s * 0.86, 0, 0);
-    mk(box(0.5, 0.056, 0.08), green, wing, s * 0.4, 0, 0.08);
-  }
-  for (const s of [-1, 1]) {
-    const a = arm(R, b, s, 0.5, 1.92, 0, white, lav, 0.66, 0.11, 0.18);
-    mk(sphere(0.17), green, a);
-    mk(cyl(0.125, 0.125, 0.1), green, a, 0, -0.64, 0);
-  }
-  const col = mk(new THREE.TorusGeometry(0.22, 0.07, 10, 24), purple, b, 0, 2.06, 0);
-  col.rotation.x = Math.PI / 2;
-  const head = R.head = pivot(b, 0, 2.42, 0);
-  mk(sphere(0.38), purple, head, 0, 0.03, -0.06).scale.set(1, 1.1, 1);
-  mk(sphere(0.31), skin, head, 0, -0.02, 0.1).scale.set(1, 1.12, 1);
-  mk(sphere(0.2), skin, head, 0, -0.2, 0.2).scale.set(1.25, 0.85, 1);
-  for (const s of [-1, 1]) {
-    eye(head, s * 0.11, 0.07, 0.355, 0.075, 0x5a3a8a);
-    const brow = mk(box(0.12, 0.035, 0.04), M(0x3a2516), head, s * 0.11, 0.19, 0.37);
-    brow.rotation.z = s * 0.12;
-    const ear = mk(cyl(0.1, 0.1, 0.08), green, head, s * 0.38, 0, -0.02);
-    ear.rotation.z = Math.PI / 2;
-  }
-  smile(head, 0, -0.16, 0.37, 0.09, 0.02);
-  const helmet = new THREE.Mesh(sphere(0.56, 32, 20), new THREE.MeshStandardMaterial({ color: 0xdff3ff, transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0.2, depthWrite: false }));
-  helmet.position.set(0, 0.04, 0.04);
-  head.add(helmet);
-  R.h = 3.0;
-  return R;
-}
-
-function makeJessie() {
-  const R = rig('Jessie');
-  const b = R.body;
-  const jeans = M(0x3566b5), boot = M(0x7a4520), skin = M(0xf5c8a2), hair = M(0xc8402a), red = M(0xd23a32);
-  const white = M(0xfbf8f0), yellow = M(0xf4c531);
-  for (const s of [-1, 1]) {
-    const leg = pivot(b, s * 0.16, 1.15, 0);
-    mk(cyl(0.125, 0.115, 0.9), jeans, leg, 0, -0.45, 0);
-    mk(cyl(0.155, 0.14, 0.62), texM(cowBrown), leg, 0, -0.3, 0);
-    mk(cyl(0.145, 0.15, 0.34), boot, leg, 0, -0.93, 0);
-    mk(box(0.23, 0.12, 0.4), boot, leg, 0, -1.08, 0.07);
-    R.legs.push(leg);
-  }
-  mk(cyl(0.28, 0.27, 0.22), jeans, b, 0, 1.13, 0);
-  mk(cyl(0.29, 0.28, 0.12), M(0x5a3214), b, 0, 1.24, 0);
-  mk(box(0.15, 0.1, 0.05), M(0xf2c84b, { metalness: 0.6, roughness: 0.3 }), b, 0, 1.24, 0.29);
-  mk(cyl(0.27, 0.28, 0.76), white, b, 0, 1.66, 0);
-  mk(cyl(0.285, 0.275, 0.26), yellow, b, 0, 1.92, 0);
-  for (const s of [-1, 1]) {
-    const a = arm(R, b, s, 0.36, 1.95, 0, white, skin, 0.7, 0.085);
-    mk(cyl(0.1, 0.1, 0.12), yellow, a, 0, -0.62, 0);
-  }
-  mk(cyl(0.085, 0.095, 0.16), skin, b, 0, 2.08, 0);
-  const head = R.head = pivot(b, 0, 2.42, 0);
-  mk(sphere(0.33), skin, head).scale.set(1, 1.1, 0.98);
-  mk(sphere(0.35), hair, head, 0, 0.08, -0.1).scale.set(1.05, 1.08, 0.98);
-  for (let i = 0; i < 6; i++) mk(sphere(0.1 - i * 0.008), hair, head, 0, -0.08 - i * 0.14, -0.38 - i * 0.03);
-  mk(box(0.16, 0.08, 0.08), yellow, head, 0, -0.9, -0.55);
-  for (const s of [-1, 1]) {
-    eye(head, s * 0.12, 0.06, 0.28, 0.09, 0x2f8a44);
-    const lash = mk(box(0.14, 0.03, 0.03), M(0x3a1a10), head, s * 0.13, 0.15, 0.33);
-    lash.rotation.z = -s * 0.25;
-  }
-  mk(sphere(0.045), skin, head, 0, -0.04, 0.33);
-  smile(head, 0, -0.14, 0.29, 0.09, 0.02, 0xb02a2a);
-  const hat = pivot(head, 0, 0.33, -0.02);
-  hat.rotation.set(-0.12, 0, 0.08);
-  mk(cyl(0.6, 0.6, 0.04, 32), red, hat);
-  mk(cyl(0.26, 0.32, 0.34), red, hat, 0, 0.19, 0);
-  mk(cyl(0.326, 0.326, 0.06), white, hat, 0, 0.05, 0);
-  R.h = 2.95;
-  return R;
-}
-
-function makeRex() {
-  const R = rig('Rex');
-  const b = R.body;
-  const g = M(0x6cbf3a), belly = M(0xc4e68a), spike = M(0x7e4fb8);
-  for (const s of [-1, 1]) {
-    const leg = pivot(b, s * 0.38, 0.85, -0.1);
-    mk(cyl(0.24, 0.2, 0.62), g, leg, 0, -0.32, 0);
-    mk(box(0.38, 0.18, 0.56), g, leg, 0, -0.74, 0.12);
-    R.legs.push(leg);
-  }
-  mk(sphere(0.72), g, b, 0, 1.45, 0).scale.set(1, 1.15, 0.95);
-  mk(sphere(0.62), belly, b, 0, 1.38, 0.3).scale.set(0.82, 1.05, 0.6);
-  for (const s of [-1, 1]) {
-    const a = pivot(b, s * 0.48, 1.75, 0.42);
-    mk(cyl(0.07, 0.06, 0.3), g, a, 0, -0.15, 0.05);
-    mk(sphere(0.08), g, a, 0, -0.32, 0.08);
-    a.userData.bz = 0;
-    R.arms.push(a);
-  }
-  const tail = mk(cone(0.36, 1.5), g, b, 0, 0.95, -1.1);
-  tail.rotation.x = -Math.PI / 2 - 0.35;
-  [[2.05, -0.42], [1.75, -0.64], [1.4, -0.72], [1.05, -0.72], [0.82, -1.15]].forEach(([y, z], i) => {
-    const sp = mk(cone(0.11 - i * 0.008, 0.26, 8), spike, b, 0, y, z);
-    sp.rotation.x = -0.5 - i * 0.2;
-  });
-  const head = R.head = pivot(b, 0, 2.3, 0.28);
-  mk(sphere(0.42), g, head, 0, 0, 0.25).scale.set(1, 0.85, 1.35);
-  mk(sphere(0.36), g, head, 0, -0.2, 0.25).scale.set(0.95, 0.5, 1.25);
-  for (const s of [-1, 1]) {
-    eye(head, s * 0.2, 0.22, 0.42, 0.11, 0x3a2516);
-    mk(sphere(0.03), M(0x2a4a14), head, s * 0.08, 0.05, 0.82);
-    for (let k = 0; k < 2; k++) {
-      const t = mk(cone(0.035, 0.08, 6), M(0xffffff), head, s * (0.1 + k * 0.1), -0.13, 0.7 - k * 0.06);
-      t.rotation.x = Math.PI;
-    }
-  }
-  const m = smile(head, 0, -0.08, 0.66, 0.26, 0.03, 0x2f4d18);
-  m.rotation.x = -0.6;
-  R.h = 3.0; R.stepRate = 7;
-  return R;
-}
-
-function makeHamm() {
-  const R = rig('Hamm');
-  const b = R.body;
-  const pink = M(0xf3a0b4), dark = M(0xd06f8a);
-  for (const [x, z] of [[-0.33, 0.45], [0.33, 0.45], [-0.33, -0.45], [0.33, -0.45]]) {
-    const leg = pivot(b, x, 0.45, z);
-    mk(cyl(0.13, 0.12, 0.38), pink, leg, 0, -0.2, 0);
-    mk(cyl(0.125, 0.125, 0.07), dark, leg, 0, -0.39, 0);
-    R.legs.push(leg);
-  }
-  mk(sphere(0.7, 32, 20), pink, b, 0, 0.95, 0).scale.set(1, 0.9, 1.25);
-  const sn = mk(cyl(0.22, 0.24, 0.2), pink, b, 0, 0.98, 0.9);
-  sn.rotation.x = Math.PI / 2;
-  for (const s of [-1, 1]) {
-    mk(sphere(0.045), M(0x7a3048), b, s * 0.08, 0.98, 1.0);
-    eye(b, s * 0.25, 1.3, 0.62, 0.09, 0x3a2516);
-    const ear = mk(cone(0.14, 0.26, 12), pink, b, s * 0.32, 1.52, 0.35);
-    ear.rotation.set(0.3, 0, -s * 0.45);
-  }
-  smile(b, 0, 0.78, 0.8, 0.1, 0.02, 0x7a3048).rotation.x = -0.4;
-  mk(box(0.4, 0.035, 0.08), M(0x222222), b, 0, 1.575, 0);
-  mk(cyl(0.12, 0.12, 0.06), M(0xd9b47a), b, 0, 0.36, 0);
-  mk(new THREE.TorusGeometry(0.08, 0.025, 8, 16), pink, b, 0, 1.0, -0.88);
-  R.h = 1.7; R.stepRate = 12;
-  return R;
-}
-
-function makeSlinky() {
-  const R = rig('Slinky');
-  const b = R.body;
-  const tan = M(0xd9a35a), light = M(0xf0cf98), black = M(0x2a1d14);
-  const metal = M(0xc9ced6, { metalness: 0.85, roughness: 0.25 });
-  for (const [x, z] of [[-0.15, 0.55], [0.15, 0.55], [-0.15, -0.7], [0.15, -0.7]]) {
-    const leg = pivot(b, x, 0.45, z);
-    mk(cyl(0.07, 0.07, 0.36), tan, leg, 0, -0.2, 0);
-    mk(sphere(0.09), tan, leg, 0, -0.38, 0.03);
-    R.legs.push(leg);
-  }
-  mk(sphere(0.3), tan, b, 0, 0.62, 0.5);
-  mk(sphere(0.3), tan, b, 0, 0.62, -0.72);
-  for (let i = 0; i < 10; i++) mk(new THREE.TorusGeometry(0.27, 0.035, 8, 24), metal, b, 0, 0.62, 0.3 - i * 0.09);
-  const tl = mk(cone(0.06, 0.4, 8), tan, b, 0, 0.85, -1.0);
-  tl.rotation.x = -0.8;
-  const col = mk(new THREE.TorusGeometry(0.2, 0.04, 8, 20), M(0xe23b2e), b, 0, 0.8, 0.7);
-  col.rotation.x = 1.2;
-  const head = R.head = pivot(b, 0, 1.02, 0.78);
-  mk(sphere(0.32), tan, head).scale.set(1, 0.95, 1.05);
-  mk(sphere(0.17), light, head, 0, -0.08, 0.3).scale.set(1, 0.8, 1.2);
-  mk(sphere(0.07), black, head, 0, -0.02, 0.5);
-  for (const s of [-1, 1]) {
-    const ear = mk(new THREE.CapsuleGeometry(0.08, 0.28, 4, 10), black, head, s * 0.3, -0.08, 0);
-    ear.rotation.z = s * 0.3;
-    eye(head, s * 0.12, 0.1, 0.27, 0.07);
-  }
-  smile(head, 0, -0.16, 0.36, 0.07, 0.015, 0x2a1d14);
-  R.h = 1.4; R.stepRate = 13;
-  return R;
-}
-
-function makeForky() {
-  const R = rig('Forky');
-  const b = R.body;
-  const white = M(0xf8f8f4, { roughness: 0.3 }), red = M(0xd8342c, { roughness: 0.9 }), clay = M(0x3b6fd6, { roughness: 0.9 }), stick = M(0xdcb57a);
-  for (const s of [-1, 1]) {
-    const leg = pivot(b, s * 0.1, 0.66, 0);
-    const st = mk(box(0.12, 0.68, 0.04), stick, leg, s * 0.03, -0.32, 0);
-    st.rotation.z = -s * 0.1;
-    R.legs.push(leg);
-  }
-  mk(sphere(0.12), clay, b, 0, 0.66, 0).scale.set(1.2, 0.8, 0.8);
-  mk(box(0.2, 0.8, 0.07), white, b, 0, 1.06, 0);
-  mk(sphere(0.32), white, b, 0, 1.76, 0.02).scale.set(0.95, 1.15, 0.3);
-  for (let i = -1; i <= 1; i++) mk(box(0.075, 0.26, 0.06), white, b, i * 0.15, 2.18, 0.02);
-  eye(b, -0.12, 1.84, 0.1, 0.11, 0x111111);
-  eye(b, 0.13, 1.81, 0.1, 0.085, 0x111111);
-  const brow = mk(box(0.34, 0.05, 0.05), clay, b, 0, 1.99, 0.11);
-  brow.rotation.z = 0.08;
-  smile(b, 0, 1.6, 0.1, 0.08, 0.025, 0xd8342c);
-  for (const s of [-1, 1]) {
-    const a = pivot(b, s * 0.1, 1.25, 0.04);
-    const curve = new THREE.CatmullRomCurve3([new V3(0, 0, 0), new V3(s * 0.22, 0.08, 0), new V3(s * 0.4, -0.08, 0.02), new V3(s * 0.52, 0.12, 0.04)]);
-    mk(new THREE.TubeGeometry(curve, 20, 0.032, 6), red, a);
-    a.userData.bz = 0;
-    R.arms.push(a);
-  }
-  R.h = 2.3; R.stepRate = 11;
-  return R;
-}
-
-function makeLilypad() {
-  const R = rig('Lilypad');
-  const b = R.body;
-  const green = M(0x58c46a, { roughness: 0.35 }), dark = M(0x3a9a50);
-  for (const s of [-1, 1]) {
-    const leg = pivot(b, s * 0.25, 0.42, 0);
-    mk(cyl(0.08, 0.08, 0.34), dark, leg, 0, -0.17, 0);
-    mk(sphere(0.12), green, leg, 0, -0.36, 0.08).scale.set(1.3, 0.5, 1.6);
-    R.legs.push(leg);
-  }
-  mk(new THREE.CapsuleGeometry(0.12, 1.0, 6, 12), green, b, -0.43, 1.05, 0);
-  mk(new THREE.CapsuleGeometry(0.12, 1.0, 6, 12), green, b, 0.43, 1.05, 0);
-  mk(box(0.86, 1.24, 0.24), green, b, 0, 1.05, 0);
-  const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.76, 0.98), new THREE.MeshStandardMaterial({ map: frogScreenTex, emissive: 0xffffff, emissiveMap: frogScreenTex, emissiveIntensity: 0.6, roughness: 0.2 }));
-  scr.position.set(0, 1.04, 0.125);
-  b.add(scr);
-  for (const s of [-1, 1]) {
-    mk(sphere(0.2), green, b, s * 0.28, 1.7, 0.02);
-    eye(b, s * 0.28, 1.74, 0.15, 0.11, 0x2a1d14);
-    const a = arm(R, b, s, 0.57, 1.25, 0, dark, green, 0.36, 0.06, 0.2);
-  }
-  R.h = 2.0; R.stepRate = 10;
-  return R;
 }
 
 const PLAYABLE = [
@@ -1033,7 +625,12 @@ const friends = FRIENDS.map((f) => {
 function animChar(R, dt, amt, t) {
   R.phase += dt * R.stepRate * amt;
   const sw = Math.sin(R.phase);
-  R.legs.forEach((l, i) => { l.rotation.x = Math.sin(R.phase + ((i + (i >> 1)) % 2 ? Math.PI : 0)) * 0.65 * amt; });
+  R.legs.forEach((l, i) => {
+    const ph = R.phase + ((i + (i >> 1)) % 2 ? Math.PI : 0);
+    l.rotation.x = Math.sin(ph) * 0.65 * amt;
+    if (R.knees[i]) R.knees[i].rotation.x = Math.max(0, -Math.cos(ph)) * 0.9 * amt;
+  });
+  R.elbows.forEach((e, i) => { e.rotation.x = e.userData.bx - (R.cheer > 0 ? 0 : Math.max(0, Math.sin(R.phase + (i ? 0 : Math.PI))) * 0.5 * amt); });
   const breathe = Math.sin(t * 2.4 + R.h) * 0.02;
   if (R.cheer > 0) {
     R.cheer -= dt;
@@ -1332,8 +929,9 @@ addEventListener('blur', () => keys.clear());
       R.root.rotation.y = 0.35;
       sc.add(R.root);
       const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
-      cam.position.set(0, R.h * 0.62, 6.6);
-      cam.lookAt(0, R.h * 0.55, 0);
+      R.root.rotation.y = 0.25;
+      cam.position.set(0, R.h * 0.78, 4.4);
+      cam.lookAt(0, R.h * 0.66, 0);
       r2.render(sc, cam);
       img.src = r2.domElement.toDataURL('image/png');
     }
