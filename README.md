@@ -1,16 +1,27 @@
 # Sala de Juegos
 
-Juegos de recreativa en JavaScript puro, cada uno en un solo archivo HTML (canvas, sin dependencias).
+Juegos de recreativa en JavaScript puro, cada uno en un solo archivo HTML (canvas, sin dependencias externas; las librerías que hacen falta van incluidas en la carpeta del juego).
 
 Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 
 | Juego | Carpeta | Qué es |
 | --- | --- | --- |
+| Toy Story: La Gran Aventura | [`toystory/`](toystory/) | Aventura en 3D para niños pequeños con Woody, Buzz y Jessie |
 | Godzilla: Choque de Titanes | [`godzilla/`](godzilla/) | Peleas de kaijus 2 contra 2 al estilo Marvel vs Capcom |
 | Angry Kaijus | [`birds/`](birds/) | Al estilo Angry Birds: tirachinas y física contra las fortalezas de los Mechas |
 | Godzilla Pac-Man | [`pacman/`](pacman/) | Pac-Man con Godzilla como protagonista y kaijus como enemigos |
 
 El `index.html` de la raíz es el índice. Para añadir un juego, crea su carpeta con un `index.html` y suma una entrada a la lista `GAMES` del índice.
+
+## Toy Story: La Gran Aventura
+
+Pensado para niñas y niños de unos 5 años: no se puede perder y la voz del navegador lee en voz alta cada misión y cuenta en español.
+
+- Elige a Woody, Buzz o Jessie
+- **Toca el suelo** (o haz clic) para caminar · también **flechas** o **WASD** · **Espacio** o el botón rojo para saltar · **M** música
+- Misiones: recoger 10 estrellas, encontrar a Rex, Hamm, Slinky, Forky y Lilypad (te siguen en fila) y explotar 10 globos; al final, fiesta con todos
+- Una flecha amarilla en el suelo señala siempre lo que falta; la pelota se puede patear
+- Gráficos 3D con [Three.js](https://threejs.org/) r160 (MIT), incluido en `toystory/three.module.min.js`. Los personajes son versiones propias hechas con figuras simples y la música es original, compuesta con Web Audio (no es la banda sonora de la película)
 
 ## Godzilla: Choque de Titanes
 
