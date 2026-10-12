@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Angry Kaijus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap">
+<style>
+  :root {
+    --bg: #0d1b2a;
+    --text: #f4f7ff;
+    --muted: #9fb3c8;
+    --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: dark;
+  }
+  html { height: 100%; box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: inherit; }
+  body {
+    height: 100%;
+    margin: 0;
+    padding-inline: 16px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    padding-block: 8px;
+  }
+  #game { display: block; border-radius: 10px; background: #8fd3f4; cursor: pointer; }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 16px;
+    padding-block: 4px 10px;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .bar a { color: var(--text); text-decoration: none; font-family: "Lilita One", var(--font-ui); font-size: 15px; }
+  .bar a:hover { text-decoration: underline; }
+  kbd { font-family: var(--font-ui); font-size: 11px; color: var(--text); background: #1b2d44; border: 1px solid #2c4562; border-radius: 4px; padding: 1px 5px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game" width="1600" height="900" aria-label="Angry Kaijus: lanza kaijus con el tirachinas"></canvas>
+</div>
+<div class="bar">
+  <a href="../">◀ Juegos</a>
+  <span>Arrastra el kaiju hacia atrás y suelta para lanzarlo · Toca en pleno vuelo para usar su poder · <kbd>R</kbd> repetir · <kbd>Esc</kbd> pausa · <kbd>M</kbd> sonido</span>
+</div>
+<script src="matter.min.js"></script>
+<script>
+(() => {
+"use strict";
+const { Engine, Bodies, Body, Composite, Events, Vector, Sleeping } = Matter;
+const W = 1600, H = 900, GROUND = 800;
+const SLING = { x: 250, y: 668 };
+const MAX_PULL = 140;
+const FONT = '"Lilita One", system-ui, sans-serif';
+const cv = document.getElementById("game");
+const ctx = cv.getContext("2d");
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* ---------- Pantalla ---------- */
+const stage = document.getElementById("stage");
+function resize() {
+  const r = stage.getBoundingClientRect();
+  const w = Math.min(r.width, (r.height - 16) * 16 / 9), h = w * 9 / 16;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.style.width = w + "px"; cv.style.height = h + "px";
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+}
+addEventListener("resize", resize);
+resize();
+
+/* ---------- Sonido ---------- */
+let actx = null, muted = false, noiseBuf = null;
+function audio() {
+  if (!actx) {
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    } catch (e) { actx = null; }
+  }
+  if (actx && actx.state === "suspended") actx.resume();
+}
+function tone(f, dur, type, vol, slide, delay) {
+  if (!actx || muted) return;
+  const t = actx.currentTime + (delay || 0), o = actx.createOscillator(), g = actx.createGain();
+  o.type = type || "square"; o.frequency.setValueAtTime(f, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, f + slide), t + dur);
+  g.gain.setValueAtTime(vol || .1, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur);
+}
+function noise(dur, vol, freq, type) {
+  if (!actx || muted) return;
+  const t = actx.currentTime, s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = noiseBuf; f.type = type || "lowpass"; f.frequency.value = freq || 1000;
+  g.gain.setValueAtTime(vol || .2, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+  s.connect(f).connect(g).connect(actx.destination); s.start(t); s.stop(t + dur);
+}
+let lastHitSfx = 0;
+const sfx = {
+  stretch() { tone(180, .25, "triangle", .08, 160); },
+  launch() { noise(.25, .25, 2500, "bandpass"); tone(500, .25, "sawtooth", .05, 600); },
+  wood() { noise(.12, .25, 700); tone(160, .08, "square", .05, -40); },
+  glass() { noise(.3, .2, 5000, "highpass"); tone(1800, .15, "sine", .05, 900); },
+  stone() { noise(.15, .3, 300); },
+  poof() { noise(.35, .25, 1200); tone(700, .3, "square", .06, -500); },
+  hit() { const n = performance.now(); if (n - lastHitSfx < 60) return; lastHitSfx = n; noise(.08, .15, 900); },
+  pulse() { tone(120, .8, "sawtooth", .12, -60); noise(.8, .35, 400); },
+  dash() { tone(300, .35, "sawtooth", .07, 900); noise(.3, .15, 3000, "bandpass"); },
+  split() { tone(900, .1, "square", .06); tone(1200, .1, "square", .06, 0, .08); tone(1500, .12, "square", .06, 0, .16); },
+  heavy() { tone(90, .4, "square", .1, -40); },
+  roar() { tone(240, .7, "sawtooth", .09, -160); noise(.6, .1, 600); },
+  win() { [523, 659, 784, 1046].forEach((f, i) => tone(f, .25, "square", .07, 0, i * .14)); },
+  lose() { [392, 330, 262].forEach((f, i) => tone(f, .35, "triangle", .1, 0, i * .22)); },
+  click() { tone(800, .05, "square", .06); },
+  star(i) { tone(880 + i * 220, .2, "square", .07); },
+};
+
+/* ---------- Progreso ---------- */
+let progress = { stars: [] };
+try { progress = JSON.parse(localStorage.getItem("angrykaijus") || "") || progress; } catch (e) {}
+if (!Array.isArray(progress.stars)) progress.stars = [];
+function saveProgress() { try { localStorage.setItem("angrykaijus", JSON.stringify(progress)); } catch (e) {} }
+
+/* ---------- Kaijus (los "pájaros") ---------- */
+const BIRDS = {
+  godzilla: { name: "Godzilla", r: 24, density: .004, power: "PULSO NUCLEAR" },
+  rodan: { name: "Rodan", r: 21, density: .0035, power: "PICADA SUPERSÓNICA" },
+  ghidorah: { name: "Ghidorah", r: 19, density: .004, power: "TRES CABEZAS" },
+  anguirus: { name: "Anguirus", r: 26, density: .006, power: "BOLA DE PINCHOS" },
+};
+const MATS = {
+  wood: { density: .0012, hp: 30, friction: .7, pts: 500, sfx: "wood" },
+  glass: { density: .0009, hp: 10, friction: .4, pts: 500, sfx: "glass" },
+  stone: { density: .0028, hp: 80, friction: .8, pts: 1000, sfx: "stone" },
+};
+
+/* ---------- Niveles ---------- */
+// y de los bloques: base (yb) sobre la que se apoya; el tamaño en px del mundo (1600 × 900, suelo en 800)
+function post(x, yb, h, mat, w) { return { t: "block", x, y: yb - h / 2, w: w || 22, h, mat }; }
+function plank(x, yb, w, mat) { return { t: "block", x, y: yb - 11, w, h: 22, mat }; }
+function box(x, yb, s, mat) { return { t: "block", x, y: yb - s / 2, w: s, h: s, mat }; }
+function mecha(x, yb, kind) { const r = kind === "boss" ? 42 : kind === "helmet" ? 27 : 24; return { t: "enemy", x, y: yb - r, r, kind: kind || "basic" }; }
+function hill(x, top, w) { return { t: "terrain", x, y: (top + GROUND) / 2 + 10, w, h: GROUND - top + 20 }; }
+
+const LEVELS = [
+  { name: "Primer contacto", birds: ["godzilla", "godzilla", "godzilla"], items: [
+    post(1060, 800, 110, "wood"), post(1180, 800, 110, "wood"), plank(1120, 690, 180, "wood"), mecha(1120, 668),
+    box(1330, 800, 50, "wood"), mecha(1330, 750),
+  ] },
+  { name: "Cristalería", birds: ["ghidorah", "godzilla", "ghidorah"], items: [
+    post(1000, 800, 100, "glass"), post(1130, 800, 100, "glass"), plank(1065, 700, 180, "wood"), mecha(1065, 800),
+    post(1010, 678, 90, "glass"), post(1120, 678, 90, "glass"), plank(1065, 588, 160, "wood"), mecha(1065, 678), mecha(1065, 566),
+    post(1290, 800, 100, "wood"), post(1380, 800, 100, "wood"), plank(1335, 700, 140, "glass"), mecha(1335, 678),
+  ] },
+  { name: "Fortaleza de piedra", birds: ["rodan", "godzilla", "anguirus", "godzilla"], items: [
+    post(990, 800, 120, "stone", 26), post(1190, 800, 120, "stone", 26), plank(1090, 680, 236, "stone"), mecha(1090, 800, "helmet"),
+    post(1015, 658, 100, "wood"), post(1165, 658, 100, "wood"), plank(1090, 558, 190, "wood"), mecha(1090, 658), mecha(1090, 536),
+    box(1260, 800, 50, "glass"), box(1260, 750, 50, "glass"), box(1310, 800, 50, "stone"), mecha(1380, 800),
+  ] },
+  { name: "Pirámide", birds: ["ghidorah", "godzilla", "rodan"], items: (() => {
+    const it = [], mats = ["stone", "wood", "wood", "glass", "glass"];
+    for (let i = 0; i < 5; i++) for (let j = 0; j < 5 - i; j++) it.push(box(1000 + i * 26 + j * 52, 800 - i * 52, 52, mats[i]));
+    it.push(mecha(1104, 540, "helmet"), post(1340, 800, 90, "glass"), mecha(1400, 800), mecha(1500, 800));
+    return it;
+  })() },
+  { name: "Torres gemelas", birds: ["godzilla", "rodan", "ghidorah", "anguirus"], items: (() => {
+    const it = [], mats = ["stone", "wood", "glass"];
+    for (const cx of [990, 1330]) for (let f = 0; f < 3; f++) {
+      const yb = 800 - f * 112;
+      it.push(post(cx - 58, yb, 90, mats[f]), post(cx + 58, yb, 90, mats[f]), plank(cx, yb - 90, 150, f === 2 ? "wood" : mats[f]), mecha(cx, yb, f === 0 ? "helmet" : "basic"));
+    }
+    it.push(mecha(1160, 800, "boss"));
+    return it;
+  })() },
+  { name: "La colina del jefe", birds: ["anguirus", "ghidorah", "rodan", "godzilla"], items: [
+    hill(1260, 650, 420),
+    post(1150, 650, 120, "wood"), post(1370, 650, 120, "wood"), plank(1260, 530, 250, "stone"), mecha(1260, 650, "boss"),
+    mecha(1200, 508, "helmet"), mecha(1320, 508),
+    post(1080, 650, 80, "glass"), post(1440, 650, 80, "glass"),
+    post(930, 800, 110, "wood"), box(990, 800, 50, "stone"), mecha(1000, 750),
+    mecha(1510, 650),
+  ] },
+];
+
+/* ---------- Estado ---------- */
+let scene = "title"; // title, levels, play
+let overlay = null; // null, pause, win, lose
+let engine, world;
+let level = 0, levelData = null;
+let queue = [], flying = [], trail = [], lastTrail = [], particles = [], popups = [], removeQ = [];
+let state = "aim"; // aim, fly, settle, done
+let score = 0, best = 0, stateT = 0, settleT = 0, tick = 0, shake = 0;
+let drag = null; // {x, y} tirón actual
+let abilityUsed = false, overlayT = 0, starsWon = 0;
+const clouds = Array.from({ length: 7 }, (_, i) => ({ x: i * 260 + rnd(0, 120), y: rnd(60, 260), s: rnd(.7, 1.3), v: rnd(.08, .2) }));
+
+function makeBody(it) {
+  let b;
+  if (it.t === "block") {
+    const m = MATS[it.mat];
+    b = Bodies.rectangle(it.x, it.y, it.w, it.h, { density: m.density, friction: m.friction, restitution: .05, frictionStatic: 1 });
+    b.plugin = { kind: "block", mat: it.mat, w: it.w, h: it.h, hp: m.hp * (it.w * it.h) / (22 * 100), cracks: [], grain: Array.from({ length: 3 }, () => rnd(.15, .85)) };
+    b.plugin.maxHp = b.plugin.hp = Math.max(m.hp * .6, b.plugin.hp);
+  } else if (it.t === "enemy") {
+    b = Bodies.circle(it.x, it.y, it.r, { density: .0012, friction: .6, restitution: .2 });
+    const hp = it.kind === "boss" ? 36 : it.kind === "helmet" ? 16 : 6;
+    b.plugin = { kind: "enemy", type: it.kind, r: it.r, hp, maxHp: hp, blink: 0 };
+  } else {
+    b = Bodies.rectangle(it.x, it.y, it.w, it.h, { isStatic: true, friction: .9 });
+    b.plugin = { kind: "terrain", w: it.w, h: it.h };
+  }
+  return b;
+}
+function startLevel(i) {
+  level = i; levelData = LEVELS[i];
+  engine = Engine.create({ enableSleeping: true });
+  engine.positionIterations = 10; engine.velocityIterations = 8;
+  world = engine.world;
+  const ground = Bodies.rectangle(W / 2, GROUND + 100, W * 3, 200, { isStatic: true, friction: .9 });
+  ground.plugin = { kind: "ground" };
+  Composite.add(world, ground);
+  for (const it of levelData.items) Composite.add(world, makeBody(it));
+  Events.on(engine, "collisionStart", onCollide);
+  queue = levelData.birds.slice();
+  flying = []; trail = []; lastTrail = []; particles = []; popups = []; removeQ = [];
+  score = 0; state = "aim"; stateT = 0; settleT = 90; drag = null; abilityUsed = false; overlay = null; shake = 0;
+  scene = "play";
+}
+const enemies = () => Composite.allBodies(world).filter(b => b.plugin.kind === "enemy" && !b.dead);
+
+/* ---------- Daño ---------- */
+function onCollide(e) {
+  for (const p of e.pairs) {
+    const a = p.bodyA, b = p.bodyB;
+    const rv = Vector.magnitude(Vector.sub(a.velocity, b.velocity));
+    if (rv < 1.6) continue;
+    if (a.plugin.kind === "bird" || b.plugin.kind === "bird") { if (rv > 4) sfx.hit(); }
+    if (settleT > 0) continue;
+    hurtByImpact(a, b, rv); hurtByImpact(b, a, rv);
+  }
+}
+function hurtByImpact(body, other, rv) {
+  const d = body.plugin;
+  if (!d || (d.kind !== "block" && d.kind !== "enemy") || body.dead) return;
+  const m = other.isStatic ? body.mass : Math.min(other.mass, body.mass * 4);
+  let dmg = .04 * m * rv * rv;
+  if (other.plugin.kind === "bird") dmg *= 1.6;
+  if (other.plugin.heavy && d.kind === "block") dmg *= d.mat === "stone" ? 2.2 : 1.6;
+  if (d.kind === "block" && d.mat === "glass" && other.plugin.bird === "ghidorah") dmg *= 2.5;
+  if (d.kind === "block" && d.mat === "stone" && other.plugin.bird === "anguirus") dmg *= 2;
+  damage(body, dmg);
+}
+function damage(body, dmg) {
+  const d = body.plugin;
+  if (body.dead || dmg < .5) return;
+  d.hp -= dmg;
+  if (d.kind === "block") {
+    if (dmg > 3) { sfx[MATS[d.mat].sfx](); chips(body, 3); }
+    while (d.cracks.length < 3 && d.hp < d.maxHp * (1 - (d.cracks.length + 1) * .25)) d.cracks.push([rnd(-.4, .4), rnd(-.4, .4), rnd(0, Math.PI)]);
+  } else if (d.kind === "enemy") d.blink = 20;
+  if (d.hp <= 0) destroy(body);
+}
+function destroy(b) {
+  if (b.dead) return;
+  b.dead = true; removeQ.push(b);
+  const d = b.plugin;
+  if (d.kind === "enemy") {
+    const pts = d.type === "boss" ? 10000 : 5000;
+    addScore(pts, b.position.x, b.position.y, "#7cff6b");
+    puff(b.position.x, b.position.y, d.r * 1.6); sfx.poof();
+  } else {
+    addScore(MATS[d.mat].pts, b.position.x, b.position.y, "#fff");
+    chips(b, d.mat === "glass" ? 14 : 10); sfx[MATS[d.mat].sfx]();
+  }
+}
+function addScore(n, x, y, col) { score += n; popups.push({ x, y, text: String(n), col, t: 0 }); }
+
+/* ---------- Partículas ---------- */
+function chips(b, n) {
+  const d = b.plugin, col = d.mat === "wood" ? "#c98a45" : d.mat === "glass" ? "#bfe8ff" : "#9aa0a6";
+  for (let i = 0; i < n; i++) particles.push({ x: b.position.x + rnd(-d.w / 2, d.w / 2) * .8, y: b.position.y + rnd(-d.h / 2, d.h / 2) * .8, vx: rnd(-4, 4), vy: rnd(-6, 1), r: rnd(3, 8), a: rnd(0, 6), va: rnd(-.3, .3), life: 60, max: 60, col, type: "chip" });
+}
+function puff(x, y, s) {
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; particles.push({ x: x + Math.cos(a) * s * .3, y: y + Math.sin(a) * s * .3, vx: Math.cos(a) * 2, vy: Math.sin(a) * 2 - .5, r: s * rnd(.35, .55), life: 40, max: 40, col: "#ffffff", type: "smoke" }); }
+}
+function feathers(x, y, col) {
+  for (let i = 0; i < 6; i++) particles.push({ x, y, vx: rnd(-3, 3), vy: rnd(-4, 0), r: rnd(4, 7), a: rnd(0, 6), va: rnd(-.2, .2), life: 50, max: 50, col, type: "chip" });
+}
+function ring(x, y, r, col) { particles.push({ x, y, r, life: 26, max: 26, col, type: "ring" }); }
+
+/* ---------- Lanzamiento y poderes ---------- */
+function launch(pull) {
+  const type = queue.shift();
+  const bd = BIRDS[type];
+  const b = Bodies.circle(SLING.x + pull.x, SLING.y + pull.y, bd.r, { density: bd.density, friction: .5, restitution: .35, frictionAir: .0008 });
+  b.plugin = { kind: "bird", bird: type, r: bd.r, still: 0, t: 0 };
+  Composite.add(world, b);
+  const k = .2;
+  Body.setVelocity(b, { x: -pull.x * k, y: -pull.y * k });
+  flying = [b]; abilityUsed = false;
+  lastTrail = trail; trail = [];
+  state = "fly"; stateT = 0;
+  sfx.launch();
+}
+function useAbility() {
+  if (state !== "fly" || abilityUsed || !flying.length) return;
+  const b = flying[0];
+  if (b.dead || b.plugin.t < 4) return;
+  abilityUsed = true;
+  const type = b.plugin.bird, p = b.position, v = b.velocity;
+  popups.push({ x: p.x, y: p.y - 40, text: BIRDS[type].power, col: "#ffd23f", t: 0, big: true });
+  if (type === "godzilla") {
+    sfx.pulse(); shake = 14;
+    ring(p.x, p.y, 30, "#62ecff"); ring(p.x, p.y, 60, "#ffffff");
+    for (let i = 0; i < 20; i++) { const a = rnd(0, Math.PI * 2), s = rnd(4, 12); particles.push({ x: p.x, y: p.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: rnd(4, 9), life: 30, max: 30, col: "#62ecff", type: "glow" }); }
+    const R = 210;
+    for (const o of Composite.allBodies(world)) {
+      if (o.isStatic || o === b || o.dead) continue;
+      const dv = Vector.sub(o.position, p), dist = Vector.magnitude(dv);
+      if (dist > R) continue;
+      const f = 1 - dist / R, dir = dist > 0 ? Vector.mult(dv, 1 / dist) : { x: 1, y: 0 };
+      Sleeping.set(o, false);
+      Body.setVelocity(o, Vector.add(o.velocity, Vector.mult(dir, 16 * f)));
+      Body.setAngularVelocity(o, o.angularVelocity + rnd(-.2, .2) * f);
+      if (o.plugin.kind === "block") damage(o, 40 * f * (o.plugin.mat === "stone" ? .6 : 1));
+      if (o.plugin.kind === "enemy") damage(o, 14 * f);
+    }
+    Body.setVelocity(b, Vector.mult(v, .3));
+  } else if (type === "rodan") {
+    sfx.dash();
+    const sp = Math.max(Vector.magnitude(v) * 2.1, 26), dir = Vector.normalise(v);
+    Body.setVelocity(b, Vector.mult(dir, sp));
+    b.plugin.dash = 30;
+  } else if (type === "ghidorah") {
+    sfx.split();
+    const sp = Vector.magnitude(v), ang = Math.atan2(v.y, v.x);
+    for (const da of [-.22, .22]) {
+      const nb = Bodies.circle(p.x, p.y + da * 30, b.plugin.r, { density: BIRDS.ghidorah.density, friction: .5, restitution: .35, frictionAir: .0008 });
+      nb.plugin = { kind: "bird", bird: "ghidorah", r: b.plugin.r, still: 0, t: 10, clone: true };
+      Composite.add(world, nb);
+      Body.setVelocity(nb, { x: Math.cos(ang + da) * sp, y: Math.sin(ang + da) * sp });
+      flying.push(nb);
+    }
+    feathers(p.x, p.y, "#f2b632");
+  } else if (type === "anguirus") {
+    sfx.heavy();
+    Body.setDensity(b, BIRDS.anguirus.density * 4);
+    Body.setVelocity(b, { x: v.x * .9, y: Math.max(v.y, 0) + 14 });
+    b.plugin.heavy = true;
+  }
+}
+
+/* ---------- Bucle de juego ---------- */
+function bodyMoving(b) { return !b.isStatic && !b.isSleeping && b.speed > .3; }
+function step() {
+  tick++;
+  for (const c of clouds) { c.x += c.v; if (c.x > W + 150) c.x = -200; }
+  updateParticles();
+  if (scene !== "play" || overlay === "pause") return;
+  if (overlay) { overlayT++; return; }
+  Engine.update(engine, 1000 / 60);
+  if (settleT > 0) settleT--;
+  for (const b of removeQ) Composite.remove(world, b);
+  removeQ = [];
+  // fuera del mundo
+  for (const b of Composite.allBodies(world)) {
+    if (b.isStatic || b.dead) continue;
+    if (b.position.y > H + 200 || b.position.x < -300 || b.position.x > W + 300) {
+      if (b.plugin.kind === "enemy") destroy(b);
+      else if (b.plugin.kind === "block") { b.dead = true; Composite.remove(world, b); }
+    }
+  }
+  if (shake > 0) shake *= .88;
+  stateT++;
+  if (state === "fly") {
+    for (const b of flying) {
+      if (b.dead) continue;
+      const d = b.plugin; d.t++;
+      if (d.dash > 0) { d.dash--; if (tick % 2 === 0) particles.push({ x: b.position.x, y: b.position.y, vx: 0, vy: 0, r: d.r * .8, life: 16, max: 16, col: "#ff8a2a", type: "glow" }); }
+      if (b === flying[0] && tick % 3 === 0 && d.t < 400) trail.push({ x: b.position.x, y: b.position.y, s: trail.length % 4 === 0 ? 6 : 3.5 });
+      d.still = b.speed < .35 ? d.still + 1 : 0;
+      const out = b.position.x > W + 120 || b.position.x < -120 || b.position.y > H + 100;
+      if (out || d.still > 50 || d.t > 540) {
+        b.dead = true; Composite.remove(world, b);
+        if (!out) { puff(b.position.x, b.position.y, d.r * 1.4); feathers(b.position.x, b.position.y, birdColor(d.bird)); sfx.poof(); }
+      }
+    }
+    if (flying.every(b => b.dead)) { state = "settle"; stateT = 0; }
+  } else if (state === "settle") {
+    const moving = Composite.allBodies(world).some(b => !b.dead && bodyMoving(b));
+    const left = enemies().length;
+    if ((stateT > 40 && !moving) || stateT > 240 || (left === 0 && stateT > 50)) {
+      if (left === 0) winLevel();
+      else if (!queue.length) { overlay = "lose"; overlayT = 0; sfx.lose(); }
+      else { state = "aim"; stateT = 0; }
+    }
+  }
+  for (const e of enemies()) if (e.plugin.blink > 0) e.plugin.blink--;
+}
+function winLevel() {
+  const bonus = queue.length * 10000;
+  if (bonus) { score += bonus; popups.push({ x: SLING.x, y: SLING.y - 120, text: "+" + bonus, col: "#ffd23f", t: 0, big: true }); }
+  starsWon = 1 + (queue.length >= 1 ? 1 : 0) + (queue.length >= 2 ? 1 : 0);
+  progress.stars[level] = Math.max(progress.stars[level] || 0, starsWon);
+  saveProgress();
+  overlay = "win"; overlayT = 0; sfx.win();
+}
+function updateParticles() {
+  for (const p of particles) {
+    p.life--;
+    if (p.vx !== undefined) { p.x += p.vx; p.y += p.vy; }
+    if (p.type === "chip") { p.vy += .35; p.a += p.va; if (p.y > GROUND - 3) { p.y = GROUND - 3; p.vy *= -.3; p.vx *= .7; } }
+    if (p.type === "smoke") { p.vx *= .93; p.vy *= .93; p.r *= 1.01; }
+    if (p.type === "glow") { p.vx *= .92; p.vy *= .92; }
+  }
+  particles = particles.filter(p => p.life > 0);
+  for (const p of popups) { p.t++; p.y -= .6; }
+  popups = popups.filter(p => p.t < 70);
+}
+
+/* ---------- Entrada ---------- */
+let hotspots = [];
+const hot = (x, y, w, h, fn) => hotspots.push({ x, y, w, h, fn });
+function toWorld(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
+cv.addEventListener("pointerdown", e => {
+  audio();
+  const p = toWorld(e);
+  for (let i = hotspots.length - 1; i >= 0; i--) {
+    const h = hotspots[i];
+    if (p.x >= h.x && p.x <= h.x + h.w && p.y >= h.y && p.y <= h.y + h.h) { sfx.click(); h.fn(); return; }
+  }
+  if (scene !== "play" || overlay) return;
+  if (state === "aim" && queue.length && Math.hypot(p.x - SLING.x, p.y - SLING.y) < 110) {
+    drag = { x: 0, y: 0 }; try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+    sfx.stretch(); updateDrag(p);
+  } else if (state === "fly") useAbility();
+});
+function updateDrag(p) {
+  let dx = p.x - SLING.x, dy = p.y - SLING.y;
+  const l = Math.hypot(dx, dy);
+  if (l > MAX_PULL) { dx *= MAX_PULL / l; dy *= MAX_PULL / l; }
+  if (SLING.y + dy > GROUND - 20) dy = GROUND - 20 - SLING.y;
+  drag.x = dx; drag.y = dy;
+}
+cv.addEventListener("pointermove", e => { if (drag) updateDrag(toWorld(e)); });
+const release = () => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (scene === "play" && !overlay && state === "aim" && Math.hypot(d.x, d.y) > 25) launch(d);
+};
+cv.addEventListener("pointerup", release);
+cv.addEventListener("pointercancel", () => { drag = null; });
+addEventListener("keydown", e => {
+  audio();
+  if (e.code === "KeyM") muted = !muted;
+  if (scene !== "play") { if ((e.code === "Enter" || e.code === "Space") && scene === "title") scene = "levels"; return; }
+  if (e.code === "Space") { e.preventDefault(); useAbility(); }
+  if (e.code === "KeyR") startLevel(level);
+  if (e.code === "Escape" || e.code === "KeyP") { if (!overlay) overlay = "pause"; else if (overlay === "pause") overlay = null; }
+  if (e.code === "Enter" && overlay === "win" && level + 1 < LEVELS.length) startLevel(level + 1);
+});
+
+/* ---------- Dibujo: escenario ---------- */
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, Math.max(.1, r), 0, Math.PI * 2); }
+function outlined(fill, line, lw) { ctx.fillStyle = fill; ctx.fill(); if (line) { ctx.strokeStyle = line; ctx.lineWidth = lw || 3; ctx.stroke(); } }
+function text(s, x, y, size, col, align, stroke) {
+  ctx.font = `${size}px ${FONT}`; ctx.textAlign = align || "center"; ctx.textBaseline = "middle";
+  ctx.lineJoin = "round"; ctx.lineWidth = stroke == null ? size * .22 : stroke; ctx.strokeStyle = "#3a1d0b";
+  if (ctx.lineWidth) ctx.strokeText(s, x, y);
+  ctx.fillStyle = col; ctx.fillText(s, x, y);
+}
+const skyline = Array.from({ length: 22 }, (_, i) => ({ x: i * 76 + rnd(-10, 10), w: rnd(40, 70), h: rnd(90, 230) }));
+function drawBackground() {
+  const g = ctx.createLinearGradient(0, 0, 0, GROUND);
+  g.addColorStop(0, "#5ec4f2"); g.addColorStop(.7, "#bfe9fb"); g.addColorStop(1, "#e8f8ff");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#fff6b8"; circle(1400, 120, 60); ctx.fill();
+  ctx.fillStyle = "rgba(255,246,184,.35)"; circle(1400, 120, 90); ctx.fill();
+  for (const c of clouds) {
+    ctx.fillStyle = "rgba(255,255,255,.95)";
+    for (const [dx, dy, r] of [[0, 0, 40], [45, -18, 48], [95, 0, 38], [48, 14, 40]]) { circle(c.x + dx * c.s, c.y + dy * c.s, r * c.s); ctx.fill(); }
+  }
+  // ciudad lejana
+  ctx.fillStyle = "#a9d4ea";
+  for (const b of skyline) { ctx.fillRect(b.x, GROUND - 120 - b.h, b.w, b.h + 120); }
+  ctx.fillStyle = "#c4e3f2";
+  for (const b of skyline) for (let y = GROUND - 110 - b.h; y < GROUND - 140; y += 22) for (let x = b.x + 8; x < b.x + b.w - 10; x += 16) ctx.fillRect(x, y, 7, 10);
+  // colinas
+  ctx.fillStyle = "#9fd86b";
+  ctx.beginPath(); ctx.moveTo(0, GROUND);
+  for (let x = 0; x <= W; x += 20) ctx.lineTo(x, GROUND - 120 - Math.sin(x / 260) * 45 - Math.sin(x / 90 + 1) * 10);
+  ctx.lineTo(W, GROUND); ctx.fill();
+  ctx.fillStyle = "#7cc24b";
+  ctx.beginPath(); ctx.moveTo(0, GROUND);
+  for (let x = 0; x <= W; x += 20) ctx.lineTo(x, GROUND - 55 - Math.sin(x / 180 + 2) * 30);
+  ctx.lineTo(W, GROUND); ctx.fill();
+  // arbustos
+  ctx.fillStyle = "#5fa83a";
+  for (let x = 40; x < W; x += 210) { circle(x, GROUND - 10, 34); ctx.fill(); circle(x + 34, GROUND - 22, 30); ctx.fill(); circle(x + 66, GROUND - 8, 26); ctx.fill(); }
+}
+function drawGround() {
+  ctx.fillStyle = "#a8703f"; ctx.fillRect(0, GROUND, W, H - GROUND);
+  ctx.fillStyle = "#8d5a2f";
+  for (let i = 0; i < 40; i++) { const x = (i * 97) % W, y = GROUND + 30 + (i * 37) % 60; ctx.beginPath(); ctx.ellipse(x, y, 10, 5, 0, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = "#6fc33a"; ctx.fillRect(0, GROUND - 4, W, 22);
+  ctx.fillStyle = "#58a52a"; ctx.fillRect(0, GROUND + 14, W, 6);
+  ctx.fillStyle = "#86d94c";
+  for (let x = 0; x < W; x += 18) { ctx.beginPath(); ctx.moveTo(x, GROUND - 2); ctx.lineTo(x + 6, GROUND - 14); ctx.lineTo(x + 12, GROUND - 2); ctx.fill(); }
+}
+function drawTerrain(b) {
+  const d = b.plugin, x = b.position.x - d.w / 2, y = b.position.y - d.h / 2;
+  rr(x, y, d.w, d.h + 10, 18); outlined("#a8703f", "#6b4220", 4);
+  rr(x - 4, y - 6, d.w + 8, 26, 12); outlined("#6fc33a", "#3f7f1c", 4);
+}
+function drawSlingBack() {
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#5a3415"; ctx.lineWidth = 22;
+  ctx.beginPath(); ctx.moveTo(SLING.x + 6, GROUND); ctx.lineTo(SLING.x + 6, SLING.y + 60); ctx.lineTo(SLING.x + 26, SLING.y - 8); ctx.stroke();
+  ctx.strokeStyle = "#8a5426"; ctx.lineWidth = 14;
+  ctx.beginPath(); ctx.moveTo(SLING.x + 6, GROUND); ctx.lineTo(SLING.x + 6, SLING.y + 60); ctx.lineTo(SLING.x + 26, SLING.y - 8); ctx.stroke();
+}
+function drawSlingFront() {
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#5a3415"; ctx.lineWidth = 22;
+  ctx.beginPath(); ctx.moveTo(SLING.x + 6, SLING.y + 60); ctx.lineTo(SLING.x - 18, SLING.y - 4); ctx.stroke();
+  ctx.strokeStyle = "#a0662f"; ctx.lineWidth = 14;
+  ctx.beginPath(); ctx.moveTo(SLING.x + 6, SLING.y + 60); ctx.lineTo(SLING.x - 18, SLING.y - 4); ctx.stroke();
+  ctx.fillStyle = "#3b1f0e"; rr(SLING.x - 26, SLING.y - 2, 16, 18, 4); ctx.fill();
+}
+function band(fromX, fromY, x, y) {
+  ctx.strokeStyle = "#3b1f0e"; ctx.lineWidth = 9; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(fromX, fromY); ctx.lineTo(x, y); ctx.stroke();
+}
+
+/* ---------- Dibujo: personajes ---------- */
+function birdColor(t) { return { godzilla: "#4f9a3c", rodan: "#e0552d", ghidorah: "#f2b632", anguirus: "#9a6430" }[t]; }
+function eyes(x, y, r, angry, pupilCol) {
+  for (const ox of [-.18, .38]) {
+    circle(x + ox * r, y, r * .2); outlined("#fff", "#2a1405", 2.2);
+    ctx.fillStyle = pupilCol || "#111"; circle(x + ox * r + r * .07, y + r * .03, r * .09); ctx.fill();
+  }
+  if (angry) {
+    ctx.fillStyle = "#1a0d04";
+    ctx.beginPath(); ctx.moveTo(x - r * .42, y - r * .34); ctx.lineTo(x + r * .1, y - r * .14); ctx.lineTo(x + r * .1, y - r * .26); ctx.lineTo(x - r * .4, y - r * .46); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + r * .64, y - r * .36); ctx.lineTo(x + r * .16, y - r * .14); ctx.lineTo(x + r * .16, y - r * .26); ctx.lineTo(x + r * .62, y - r * .48); ctx.fill();
+  }
+}
+function drawBird(type, x, y, r, ang, opts) {
+  opts = opts || {};
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang || 0);
+  const ol = "#2a1405";
+  if (type === "godzilla") {
+    ctx.fillStyle = "#e9f2dc"; ctx.strokeStyle = ol; ctx.lineWidth = 2.5;
+    for (const [px, py, s] of [[-.75, -.55, .5], [-.4, -.9, .55], [.05, -1.02, .45], [-.95, -.1, .4]]) {
+      ctx.beginPath(); ctx.moveTo(px * r - s * r * .35, py * r + s * r * .35); ctx.lineTo(px * r + (px - .1) * s * r * .6, py * r - s * r * .55); ctx.lineTo(px * r + s * r * .35, py * r + s * r * .2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    if (opts.glow) { ctx.shadowColor = "#62ecff"; ctx.shadowBlur = 25; }
+    circle(0, 0, r); outlined("#4f9a3c", ol, 3.5); ctx.shadowBlur = 0;
+    ctx.fillStyle = "#a6d36a"; ctx.beginPath(); ctx.ellipse(r * .25, r * .45, r * .55, r * .42, -.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#3e7f2e"; ctx.beginPath(); ctx.ellipse(r * .8, r * .22, r * .42, r * .3, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = ol; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(r * .62, r * .42); ctx.lineTo(r * .7, r * .3); ctx.lineTo(r * .78, r * .42); ctx.fill();
+    ctx.fillStyle = "#1a0d04"; circle(r * 1.05, r * .12, r * .05); ctx.fill();
+    eyes(r * .1, -r * .2, r, true);
+  } else if (type === "rodan") {
+    ctx.fillStyle = "#b8391c"; ctx.strokeStyle = ol; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-r * .2, -r * .8); ctx.lineTo(-r * 1.25, -r * 1.25); ctx.lineTo(-r * .7, -r * .4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    circle(0, 0, r); outlined("#e0552d", ol, 3.5);
+    ctx.fillStyle = "#ffc857"; ctx.beginPath(); ctx.ellipse(r * .1, r * .5, r * .55, r * .35, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#b8391c"; ctx.beginPath(); ctx.ellipse(-r * .55, r * .1, r * .45, r * .25, .5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#ffb52e"; ctx.beginPath(); ctx.moveTo(r * .6, -r * .05); ctx.lineTo(r * 1.55, r * .15); ctx.lineTo(r * .6, r * .38); ctx.closePath(); ctx.fill(); ctx.stroke();
+    eyes(r * .05, -r * .25, r, true);
+  } else if (type === "ghidorah") {
+    ctx.fillStyle = "#c98f14"; ctx.strokeStyle = ol; ctx.lineWidth = 2.5;
+    for (const hx of [-.55, -.15]) { circle(hx * r, -r * .95, r * .33); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(hx * r - r * .1, -r * 1.2); ctx.lineTo(hx * r - r * .35, -r * 1.6); ctx.lineTo(hx * r + r * .08, -r * 1.25); ctx.fill(); ctx.stroke(); }
+    circle(0, 0, r); outlined("#f2b632", ol, 3.5);
+    ctx.fillStyle = "#ffe08a"; ctx.beginPath(); ctx.ellipse(r * .2, r * .45, r * .5, r * .38, -.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#c98f14"; ctx.beginPath(); ctx.moveTo(r * .1, -r * .8); ctx.lineTo(-r * .2, -r * 1.45); ctx.lineTo(r * .4, -r * .9); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#e09e1a"; ctx.beginPath(); ctx.moveTo(r * .7, 0); ctx.lineTo(r * 1.35, r * .18); ctx.lineTo(r * .7, r * .38); ctx.closePath(); ctx.fill(); ctx.stroke();
+    eyes(r * .05, -r * .2, r, true, "#c41b1b");
+  } else if (type === "anguirus") {
+    ctx.fillStyle = "#f1e2b8"; ctx.strokeStyle = ol; ctx.lineWidth = 2.5;
+    const n = opts.ball ? 12 : 7;
+    for (let i = 0; i < n; i++) {
+      const a = opts.ball ? i / n * Math.PI * 2 : Math.PI * (1.05 + i * .11);
+      ctx.beginPath(); ctx.moveTo(Math.cos(a - .2) * r * .9, Math.sin(a - .2) * r * .9); ctx.lineTo(Math.cos(a) * r * 1.45, Math.sin(a) * r * 1.45); ctx.lineTo(Math.cos(a + .2) * r * .9, Math.sin(a + .2) * r * .9); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    circle(0, 0, r); outlined("#9a6430", ol, 3.5);
+    ctx.fillStyle = "#d1a46b"; ctx.beginPath(); ctx.ellipse(r * .25, r * .45, r * .5, r * .38, -.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#7c4c21"; ctx.beginPath(); ctx.ellipse(r * .85, r * .2, r * .35, r * .26, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#f1e2b8"; ctx.beginPath(); ctx.moveTo(r * .95, 0); ctx.lineTo(r * 1.2, -r * .4); ctx.lineTo(r * 1.1, r * .05); ctx.fill(); ctx.stroke();
+    eyes(r * .1, -r * .22, r, true, "#111");
+  }
+  ctx.restore();
+}
+function drawEnemy(b) {
+  const d = b.plugin, r = d.r, ol = "#2b3440";
+  ctx.save(); ctx.translate(b.position.x, b.position.y); ctx.rotate(b.angle);
+  // antena
+  ctx.strokeStyle = ol; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, -r * 1.4); ctx.stroke();
+  ctx.fillStyle = tick % 40 < 20 ? "#ff3b3b" : "#ff9b9b"; circle(0, -r * 1.45, r * .14); ctx.fill(); ctx.stroke();
+  circle(0, 0, r); outlined(d.blink % 4 >= 2 ? "#ffffff" : "#b9c4d0", ol, 3.5);
+  ctx.fillStyle = "#dfe6ee"; ctx.beginPath(); ctx.ellipse(-r * .3, -r * .35, r * .35, r * .22, -.5, 0, Math.PI * 2); ctx.fill();
+  // remaches
+  ctx.fillStyle = "#7f8b99";
+  for (const a of [.6, 1.4, 2.2, 3.9, 5.5]) { circle(Math.cos(a) * r * .8, Math.sin(a) * r * .8, r * .06); ctx.fill(); }
+  // visor
+  rr(-r * .7, -r * .32, r * 1.4, r * .5, r * .25); outlined("#1e2530", ol, 2);
+  const hurt = d.hp < d.maxHp * .5;
+  ctx.fillStyle = "#ffe14a"; ctx.shadowColor = "#ffe14a"; ctx.shadowBlur = 8;
+  circle(-r * .3, -r * .08, r * .14); ctx.fill();
+  if (hurt) { ctx.shadowBlur = 0; ctx.strokeStyle = "#ffe14a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(r * .18, -r * .18); ctx.lineTo(r * .42, r * .02); ctx.moveTo(r * .42, -r * .18); ctx.lineTo(r * .18, r * .02); ctx.stroke(); }
+  else { circle(r * .3, -r * .08, r * .14); ctx.fill(); }
+  ctx.shadowBlur = 0;
+  // boca sonriente
+  ctx.strokeStyle = ol; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, r * .32, r * .3, .25, Math.PI - .25); ctx.stroke();
+  if (hurt) { ctx.strokeStyle = "rgba(40,40,50,.6)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(r * .5, -r * .7); ctx.lineTo(r * .3, -r * .45); ctx.lineTo(r * .55, -r * .35); ctx.stroke(); }
+  if (d.type === "helmet") {
+    ctx.beginPath(); ctx.arc(0, -r * .2, r * 1.05, Math.PI * 1.05, Math.PI * 1.95); ctx.lineTo(r * .95, -r * .3); ctx.lineTo(-r * .95, -r * .3); ctx.closePath();
+    outlined("#d23c3c", "#5a1414", 3);
+    ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.beginPath(); ctx.ellipse(-r * .35, -r * .8, r * .3, r * .1, -.4, 0, Math.PI * 2); ctx.fill();
+  } else if (d.type === "boss") {
+    ctx.beginPath(); ctx.moveTo(-r * .6, -r * .78); ctx.lineTo(-r * .7, -r * 1.35); ctx.lineTo(-r * .3, -r * 1.05); ctx.lineTo(0, -r * 1.45); ctx.lineTo(r * .3, -r * 1.05); ctx.lineTo(r * .7, -r * 1.35); ctx.lineTo(r * .6, -r * .78); ctx.closePath();
+    outlined("#ffd23f", "#7a5a00", 3);
+    ctx.fillStyle = "#e3342f"; circle(0, -r * 1.0, r * .09); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawBlock(b) {
+  const d = b.plugin;
+  ctx.save(); ctx.translate(b.position.x, b.position.y); ctx.rotate(b.angle);
+  const w = d.w, h = d.h;
+  if (d.mat === "wood") {
+    rr(-w / 2, -h / 2, w, h, 4); outlined("#d99a52", "#6e3f15", 3);
+    ctx.strokeStyle = "rgba(110,63,21,.45)"; ctx.lineWidth = 2;
+    const along = w >= h;
+    for (const g of d.grain) {
+      ctx.beginPath();
+      if (along) { ctx.moveTo(-w / 2 + 6, -h / 2 + h * g); ctx.lineTo(w / 2 - 6, -h / 2 + h * g); }
+      else { ctx.moveTo(-w / 2 + w * g, -h / 2 + 6); ctx.lineTo(-w / 2 + w * g, h / 2 - 6); }
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(255,230,180,.35)"; ctx.fillRect(-w / 2 + 3, -h / 2 + 3, along ? w - 6 : 4, along ? 4 : h - 6);
+  } else if (d.mat === "glass") {
+    rr(-w / 2, -h / 2, w, h, 3); outlined("rgba(180,228,255,.55)", "#4f9ccc", 3);
+    ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-w / 2 + 6, h / 2 - 8); ctx.lineTo(-w / 2 + Math.min(w, h) * .5, -h / 2 + 6); ctx.stroke();
+  } else {
+    rr(-w / 2, -h / 2, w, h, 5); outlined("#a3a9b0", "#4b5057", 3);
+    ctx.fillStyle = "#8a9097";
+    for (let i = 0; i < 4; i++) { const sx = ((i * 37) % 100) / 100 - .5, sy = ((i * 61) % 100) / 100 - .5; ctx.beginPath(); ctx.ellipse(sx * w * .7, sy * h * .7, 4, 3, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.fillRect(-w / 2 + 3, -h / 2 + 3, w - 6, 4);
+  }
+  ctx.strokeStyle = d.mat === "glass" ? "rgba(255,255,255,.9)" : "rgba(30,15,5,.75)"; ctx.lineWidth = 2;
+  for (const [cx, cy, ca] of d.cracks) {
+    const x0 = cx * w, y0 = cy * h, l = Math.min(w, h) * .45 + 8;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + Math.cos(ca) * l, y0 + Math.sin(ca) * l);
+    ctx.moveTo(x0, y0); ctx.lineTo(x0 - Math.cos(ca + .6) * l * .7, y0 - Math.sin(ca + .6) * l * .7); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = p.life / p.max;
+    if (p.type === "chip") { ctx.save(); ctx.globalAlpha = Math.min(1, a * 2); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.fillStyle = p.col; ctx.fillRect(-p.r / 2, -p.r / 3, p.r, p.r * .66); ctx.restore(); }
+    else if (p.type === "smoke") { ctx.globalAlpha = a * .9; ctx.fillStyle = p.col; circle(p.x, p.y, p.r); ctx.fill(); }
+    else if (p.type === "glow") { ctx.globalAlpha = a; ctx.fillStyle = p.col; circle(p.x, p.y, p.r * a + 1); ctx.fill(); }
+    else if (p.type === "ring") { ctx.globalAlpha = a; ctx.strokeStyle = p.col; ctx.lineWidth = 10 * a; circle(p.x, p.y, p.r + (1 - a) * 200); ctx.stroke(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- Dibujo: escenas ---------- */
+function button(x, y, w, h, label, fn, col) {
+  rr(x, y + 6, w, h, 18); ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.fill();
+  rr(x, y, w, h, 18); outlined(col || "#6cc63a", "#2d5e12", 5);
+  ctx.fillStyle = "rgba(255,255,255,.25)"; rr(x + 8, y + 6, w - 16, h * .3, 10); ctx.fill();
+  text(label, x + w / 2, y + h / 2 + 2, Math.min(44, h * .5), "#fff", "center", 6);
+  hot(x, y, w, h, fn);
+}
+function drawPlay() {
+  ctx.save();
+  if (shake > .5) ctx.translate(rnd(-shake, shake), rnd(-shake, shake));
+  drawBackground();
+  // rastro del tiro anterior y del actual
+  ctx.fillStyle = "rgba(255,255,255,.55)";
+  for (const t of lastTrail) { circle(t.x, t.y, t.s * .8); ctx.fill(); }
+  ctx.fillStyle = "#fff";
+  for (const t of trail) { circle(t.x, t.y, t.s); ctx.fill(); }
+  drawSlingBack();
+  // kaiju en el tirachinas
+  const loaded = state === "aim" && queue.length;
+  const bx = SLING.x + (drag ? drag.x : 0), by = SLING.y + (drag ? drag.y : 0);
+  if (loaded) {
+    band(SLING.x + 26, SLING.y - 4, bx - (drag ? BIRDS[queue[0]].r * .7 : 0), by);
+    drawBird(queue[0], bx, by, BIRDS[queue[0]].r, 0);
+  }
+  const bodies = Composite.allBodies(world);
+  for (const b of bodies) if (b.plugin.kind === "terrain") drawTerrain(b);
+  drawGround();
+  // fila de kaijus esperando
+  queue.slice(loaded ? 1 : 0).forEach((t, i) => drawBird(t, SLING.x - 70 - i * 58, GROUND - BIRDS[t].r - 2 + (Math.sin(tick * .1 + i) > .97 ? -8 : 0), BIRDS[t].r, 0));
+  for (const b of bodies) if (b.plugin.kind === "block" && !b.dead) drawBlock(b);
+  for (const b of bodies) if (b.plugin.kind === "enemy" && !b.dead) drawEnemy(b);
+  for (const b of bodies) if (b.plugin.kind === "bird" && !b.dead) drawBird(b.plugin.bird, b.position.x, b.position.y, b.plugin.r, b.angle, { glow: b.plugin.dash > 0, ball: b.plugin.heavy });
+  if (loaded) band(SLING.x - 18, SLING.y, bx - (drag ? BIRDS[queue[0]].r * .7 : 0), by + 2);
+  else band(SLING.x - 18, SLING.y, SLING.x + 26, SLING.y - 4);
+  drawSlingFront();
+  drawParticles();
+  for (const p of popups) {
+    ctx.globalAlpha = Math.min(1, (70 - p.t) / 20);
+    text(p.text, p.x, p.y, p.big ? 40 : 30, p.col);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  // HUD
+  text(levelData.name, 120, 50, 34, "#fff", "left");
+  text("PUNTOS " + score, W - 40, 50, 40, "#fff", "right");
+  const best = progress.stars[level] || 0;
+  for (let i = 0; i < 3; i++) drawStar(W - 210 + i * 40, 98, 16, i < best);
+  rr(28, 22, 70, 60, 14); outlined("#f39c12", "#7a4300", 4);
+  ctx.fillStyle = "#fff"; ctx.fillRect(48, 36, 10, 32); ctx.fillRect(68, 36, 10, 32);
+  hot(28, 22, 70, 60, () => { overlay = overlay === "pause" ? null : "pause"; });
+  if (state === "aim" && queue.length && !drag && tick % 80 < 50 && stateT < 600) text("¡Arrastra para apuntar!", SLING.x + 30, SLING.y - 110, 26, "#fff");
+  if (state === "fly" && !abilityUsed && flying.length && !flying[0].dead && flying[0].plugin.t < 120) text("Toca: " + BIRDS[flying[0].plugin.bird].power, W / 2, 140, 30, "#ffd23f");
+  if (overlay) drawOverlay();
+}
+function drawStar(x, y, r, on) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr_ = i % 2 ? r * .45 : r; ctx.lineTo(x + Math.cos(a) * rr_, y + Math.sin(a) * rr_); }
+  ctx.closePath(); outlined(on ? "#ffd23f" : "rgba(60,40,20,.45)", "#5a3a00", 3);
+}
+function panel(w, h) {
+  ctx.fillStyle = "rgba(10,20,40,.55)"; ctx.fillRect(0, 0, W, H);
+  const x = (W - w) / 2, y = (H - h) / 2;
+  rr(x, y, w, h, 30); outlined("#3d6ea8", "#173556", 8);
+  rr(x + 16, y + 16, w - 32, h - 32, 22); outlined("#4f86c6");
+  return { x, y };
+}
+function drawOverlay() {
+  if (overlay === "pause") {
+    const { x, y } = panel(560, 440);
+    text("PAUSA", W / 2, y + 80, 64, "#ffd23f");
+    button(x + 120, y + 150, 320, 76, "Seguir", () => { overlay = null; });
+    button(x + 120, y + 240, 150, 76, "↻", () => startLevel(level), "#f39c12");
+    button(x + 290, y + 240, 150, 76, "≡", () => { scene = "levels"; overlay = null; }, "#4aa3df");
+    text(muted ? "Sonido: no (M)" : "Sonido: sí (M)", W / 2, y + 370, 26, "#fff");
+    hot(x + 120, y + 345, 320, 50, () => { muted = !muted; });
+  } else if (overlay === "win") {
+    const { x, y } = panel(640, 520);
+    text("¡NIVEL SUPERADO!", W / 2, y + 80, 56, "#ffd23f");
+    for (let i = 0; i < 3; i++) {
+      const showAt = 20 + i * 18, on = i < starsWon && overlayT > showAt;
+      if (overlayT === showAt + 1 && i < starsWon) sfx.star(i);
+      const sc = on ? 1 + Math.max(0, (showAt + 10 - overlayT) / 10) : 1;
+      drawStar(W / 2 + (i - 1) * 120, y + 190 - (i === 1 ? 20 : 0), 46 * sc, on);
+    }
+    text("PUNTOS: " + score, W / 2, y + 300, 44, "#fff");
+    button(x + 70, y + 370, 140, 90, "≡", () => { scene = "levels"; overlay = null; }, "#4aa3df");
+    button(x + 250, y + 370, 140, 90, "↻", () => startLevel(level), "#f39c12");
+    if (level + 1 < LEVELS.length) button(x + 430, y + 370, 140, 90, "▶", () => startLevel(level + 1));
+    else button(x + 430, y + 370, 140, 90, "★", () => { scene = "title"; overlay = null; });
+  } else if (overlay === "lose") {
+    const { x, y } = panel(640, 440);
+    text("¡LOS MECHAS RESISTEN!", W / 2, y + 90, 50, "#ff8a5c");
+    text("Te quedaste sin kaijus. ¡Inténtalo otra vez!", W / 2, y + 170, 28, "#fff");
+    text("PUNTOS: " + score, W / 2, y + 230, 36, "#fff");
+    button(x + 140, y + 290, 160, 90, "≡", () => { scene = "levels"; overlay = null; }, "#4aa3df");
+    button(x + 340, y + 290, 160, 90, "↻", () => startLevel(level), "#f39c12");
+  }
+}
+function drawTitle() {
+  drawBackground(); drawGround();
+  const bob = Math.sin(tick * .05) * 8;
+  ctx.save(); ctx.translate(W / 2, 230 + bob); ctx.rotate(-.04);
+  text("ANGRY", 0, -60, 130, "#ff5a36", "center", 18);
+  text("KAIJUS", 0, 70, 150, "#ffd23f", "center", 20);
+  ctx.restore();
+  drawBird("godzilla", 330, GROUND - 90, 90, Math.sin(tick * .04) * .1);
+  drawBird("ghidorah", 520, GROUND - 52, 50, 0);
+  drawBird("rodan", 160, 300 + Math.sin(tick * .07) * 20, 46, .2);
+  drawEnemy({ plugin: { r: 70, type: "boss", hp: 1, maxHp: 1, blink: 0 }, position: { x: 1250, y: GROUND - 72 }, angle: 0 });
+  drawEnemy({ plugin: { r: 42, type: "helmet", hp: 1, maxHp: 1, blink: 0 }, position: { x: 1080, y: GROUND - 44 }, angle: -.1 });
+  button(W / 2 - 170, 520, 340, 110, "JUGAR", () => { scene = "levels"; });
+  text("Lanza kaijus contra las fortalezas de los Mechas", W / 2, 455, 30, "#fff");
+}
+function drawLevels() {
+  drawBackground(); drawGround();
+  text("ELIGE NIVEL", W / 2, 110, 80, "#ffd23f", "center", 14);
+  const total = progress.stars.reduce((a, s) => a + (s || 0), 0);
+  text(`★ ${total} / ${LEVELS.length * 3}`, W / 2, 190, 36, "#fff");
+  LEVELS.forEach((lv, i) => {
+    const col = i % 3, row = Math.floor(i / 3), x = 380 + col * 300, y = 260 + row * 250;
+    const unlocked = i === 0 || (progress.stars[i - 1] || 0) > 0;
+    rr(x, y + 8, 240, 200, 28); ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.fill();
+    rr(x, y, 240, 200, 28); outlined(unlocked ? "#4aa3df" : "#8396a8", unlocked ? "#1d4f75" : "#4a5866", 6);
+    if (unlocked) {
+      text(String(i + 1), x + 120, y + 70, 80, "#fff", "center", 10);
+      text(lv.name, x + 120, y + 135, 22, "#fff", "center", 4);
+      for (let s = 0; s < 3; s++) drawStar(x + 70 + s * 50, y + 172, 18, s < (progress.stars[i] || 0));
+      hot(x, y, 240, 200, () => startLevel(i));
+    } else {
+      rr(x + 90, y + 80, 60, 50, 8); outlined("#c9d3dc", "#4a5866", 4);
+      ctx.strokeStyle = "#c9d3dc"; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(x + 120, y + 80, 20, Math.PI, 0); ctx.stroke();
+    }
+  });
+  rr(28, 22, 70, 60, 14); outlined("#f39c12", "#7a4300", 4); text("◀", 63, 54, 34, "#fff", "center", 4);
+  hot(28, 22, 70, 60, () => { scene = "title"; });
+}
+function render() {
+  ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+  hotspots = [];
+  if (scene === "title") drawTitle();
+  else if (scene === "levels") drawLevels();
+  else drawPlay();
+}
+let last = performance.now(), acc = 0;
+function loop(now) {
+  acc += Math.min(100, now - last); last = now;
+  while (acc >= 1000 / 60) { step(); acc -= 1000 / 60; }
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

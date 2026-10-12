@@ -7,6 +7,7 @@ Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 | Juego | Carpeta | Qué es |
 | --- | --- | --- |
 | Godzilla: Choque de Titanes | [`godzilla/`](godzilla/) | Peleas de kaijus 2 contra 2 al estilo Marvel vs Capcom |
+| Angry Kaijus | [`birds/`](birds/) | Al estilo Angry Birds: tirachinas y física contra las fortalezas de los Mechas |
 | Godzilla Pac-Man | [`pacman/`](pacman/) | Pac-Man con Godzilla como protagonista y kaijus como enemigos |
 
 El `index.html` de la raíz es el índice. Para añadir un juego, crea su carpeta con un `index.html` y suma una entrada a la lista `GAMES` del índice.
@@ -22,6 +23,17 @@ Elige dos kaijus entre Godzilla, King Ghidorah, Mechagodzilla, Rodan, Mothra y A
 - La barra de hiper llega hasta nivel 3; cada hipercombo gasta un nivel
 - El compañero en reserva recupera la vida roja; el asistente entra, lanza su especial y se va
 - `Esc` pausa · `M` sonido · en el móvil aparecen botones táctiles
+
+## Angry Kaijus
+
+Arrastra el kaiju hacia atrás en el tirachinas y suéltalo. En pleno vuelo, toca la pantalla (o `Espacio`) para usar su poder:
+
+- **Godzilla**: pulso nuclear que hace volar todo lo que tiene cerca
+- **Rodan**: picada supersónica a doble velocidad
+- **Ghidorah**: se divide en tres; rompe muy bien el cristal
+- **Anguirus**: se hace bola de pinchos y cae a plomo; ideal contra la piedra
+
+6 niveles con madera, cristal y piedra. Las estrellas dependen de los kaijus que te sobren y se guardan en el navegador. La física usa [Matter.js](https://brm.io/matter-js/) (MIT), incluido en `birds/matter.min.js`. `R` repite el nivel, `Esc` pausa, `M` sonido.
 
 ## Godzilla Pac-Man
 
