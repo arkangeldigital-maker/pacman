@@ -6,12 +6,23 @@ Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 
 | Juego | Carpeta | Qué es |
 | --- | --- | --- |
+| Hello Kitty: El Jardín Mágico | [`hellokitty/`](hellokitty/) | Juego en 3D para niños pequeños con Hello Kitty, My Melody y Kuromi |
 | Toy Story: La Gran Aventura | [`toystory/`](toystory/) | Aventura en 3D para niños pequeños con Woody, Buzz y Jessie |
 | Godzilla: Choque de Titanes | [`godzilla/`](godzilla/) | Peleas de kaijus 2 contra 2 al estilo Marvel vs Capcom |
 | Angry Kaijus | [`birds/`](birds/) | Al estilo Angry Birds: tirachinas y física contra las fortalezas de los Mechas |
 | Godzilla Pac-Man | [`pacman/`](pacman/) | Pac-Man con Godzilla como protagonista y kaijus como enemigos |
 
 El `index.html` de la raíz es el índice. Para añadir un juego, crea su carpeta con un `index.html` y suma una entrada a la lista `GAMES` del índice.
+
+## Hello Kitty: El Jardín Mágico
+
+También pensado para niñas y niños de unos 5 años, con el mismo motor que el de Toy Story: no se puede perder y la voz del navegador lee las misiones y cuenta en español.
+
+- Elige a Hello Kitty, My Melody o Kuromi
+- **Toca el pasto** (o haz clic) para caminar · **flechas** o **WASD** · **Espacio** o el botón rojo para saltar · **M** música
+- Misiones: recoger 10 corazones, encontrar a Keroppi, Pompompurin, Cinnamoroll y Pochacco (te siguen en fila) y hacer crecer 10 flores; al final, picnic con pastel
+- Una flecha rosa en el pasto señala lo que falta; la pelota se puede patear
+- Three.js r160 (MIT) incluido en `hellokitty/three.module.min.js`. Los personajes (en `hellokitty/personajes.js`) son versiones propias modeladas con formas 3D y la música es original, una melodía de cajita musical hecha con Web Audio
 
 ## Toy Story: La Gran Aventura
 

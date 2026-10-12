@@ -85,6 +85,32 @@
 // Para añadir un juego nuevo: crea su carpeta con un index.html y suma una entrada aquí.
 const GAMES = [
   {
+    title: "Hello Kitty: El Jardín Mágico",
+    href: "hellokitty/",
+    desc: "Juego en 3D para los más pequeños: elige a Hello Kitty, My Melody o Kuromi, recoge corazones, encuentra a tus amigos y haz crecer las flores. ¡No se puede perder!",
+    tags: ["3D", "Para niños", "1 jugador"],
+    thumb: `<svg viewBox="0 0 320 180" class="thumb" aria-hidden="true">
+      <defs><linearGradient id="g5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cdeeff"/><stop offset="1" stop-color="#ffe3ef"/></linearGradient></defs>
+      <rect width="320" height="180" fill="url(#g5)"/>
+      <rect y="118" width="320" height="62" fill="#86d16a"/>
+      <g fill="#fff">${Array.from({ length: 21 }, (_, i) => `<path d="M${i * 16 + 2} 118 v-22 l5 -6 l5 6 v22z"/>`).join("")}<rect y="100" width="320" height="4"/></g>
+      <path d="M40 150 h90 l14 22 h-118z" fill="#ffb3d1"/>
+      <g fill="#fff" opacity=".7"><path d="M52 150 h12 l2 22 h-14z M76 150 h12 l4 22 h-14z M100 150 h12 l6 22 h-14z"/></g>
+      <g transform="translate(160 78)">
+        <path d="M-30 52 q30 -8 60 0 l6 30 h-72z" fill="#ff7fb0"/>
+        <ellipse cx="-14" cy="84" rx="10" ry="5" fill="#fff"/><ellipse cx="14" cy="84" rx="10" ry="5" fill="#fff"/>
+        <path d="M-44 -24 l-6 -30 l26 14z M44 -24 l6 -30 l-26 14z" fill="#fff" stroke="#e8dfe6" stroke-width="1"/>
+        <ellipse cx="0" cy="8" rx="52" ry="40" fill="#fff" stroke="#efe6ec" stroke-width="1.5"/>
+        <ellipse cx="-18" cy="8" rx="4.5" ry="6" fill="#111"/><ellipse cx="18" cy="8" rx="4.5" ry="6" fill="#111"/>
+        <ellipse cx="0" cy="18" rx="5" ry="3.5" fill="#ffd23f"/>
+        <g stroke="#222" stroke-width="1.6" stroke-linecap="round"><path d="M-40 14 h-20 M-40 20 l-19 4 M-40 8 l-19 -4 M40 14 h20 M40 20 l19 4 M40 8 l19 -4"/></g>
+        <g transform="translate(30 -30) rotate(-18)"><ellipse cx="-12" cy="0" rx="13" ry="10" fill="#e8202e"/><ellipse cx="12" cy="0" rx="13" ry="10" fill="#e8202e"/><circle r="6" fill="#ffd23f"/></g>
+      </g>
+      <g fill="#ff5fa2"><path d="M60 50 c-6 -8 -16 -2 -10 7 l10 9 l10 -9 c6 -9 -4 -15 -10 -7z"/><path d="M262 40 c-5 -6 -13 -2 -8 6 l8 7 l8 -7 c5 -8 -3 -12 -8 -6z"/><path d="M250 92 c-4 -5 -10 -1 -6 4 l6 6 l6 -6 c4 -5 -2 -9 -6 -4z"/></g>
+      <g transform="translate(270 140)"><circle r="7" fill="#ffd23f"/>${[0,72,144,216,288].map(a => `<circle cx="${Math.cos(a*Math.PI/180)*9}" cy="${Math.sin(a*Math.PI/180)*9}" r="6" fill="#fff"/>`).join("")}<circle r="5" fill="#ffd23f"/></g>
+    </svg>`,
+  },
+  {
     title: "Toy Story: La Gran Aventura",
     href: "toystory/",
     desc: "Juego en 3D para los más pequeños: elige a Woody, Buzz o Jessie, recoge estrellas, encuentra a tus amigos y explota globos. ¡No se puede perder!",
