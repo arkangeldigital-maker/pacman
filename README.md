@@ -6,6 +6,7 @@ Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 
 | Juego | Carpeta | Qué es |
 | --- | --- | --- |
+| La Casita de Gabby: ¡Fiesta con los gatitos! | [`gabby/`](gabby/) | Juego en 3D para niños pequeños con Gabby y los gatitos: conos, corazones y hula hula |
 | Villa Rosquilla: Choca y Corre | [`villarosquilla/`](villarosquilla/) | Ciudad de caricatura en 3D para recorrer a pie y en coche, con misiones y persecuciones de la policía |
 | Hello Kitty: El Jardín Mágico | [`hellokitty/`](hellokitty/) | Juego en 3D para niños pequeños con Hello Kitty, My Melody y Kuromi |
 | Toy Story: La Gran Aventura | [`toystory/`](toystory/) | Aventura en 3D para niños pequeños con Woody, Buzz y Jessie |
@@ -14,6 +15,16 @@ Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 | Godzilla Pac-Man | [`pacman/`](pacman/) | Pac-Man con Godzilla como protagonista y kaijus como enemigos |
 
 El `index.html` de la raíz es el índice. Para añadir un juego, crea su carpeta con un `index.html` y suma una entrada a la lista `GAMES` del índice.
+
+## La Casita de Gabby: ¡Fiesta con los gatitos!
+
+Para niñas y niños de unos 5 años, con el mismo estilo que Hello Kitty y Toy Story: no se puede perder y la voz del navegador lee cada misión y cuenta en español.
+
+- Elige a Gabby, Pandy o Cakey · **M** música · 🏠 vuelve al inicio
+- **Nivel 1, esquiva los conos**: corre por el camino hacia la casita y cambia de carril para no chocar con los conos amarillos y naranjas. Toca a un lado de la pantalla, desliza el dedo o usa **◀ ▶** / flechas; **Espacio** o el botón rosa salta. Si chocas, el cono sale volando y sigues corriendo
+- **Nivel 2, corazones con amigos**: camina hasta MerCat, la Gatita Hada, DJ Gatito, la Gatita Almohada y Bebé Caja. Cada uno levanta la mano con medio corazón, tú con la otra mitad; toca la pantalla para juntarlas y formar un corazón. Los amigos te siguen en fila
+- **Nivel 3, hula hula**: toca rápido (o **Espacio**) para que el aro gire y suba a la cintura; cada cuatro vueltas ganas una estrella. Al final, fiesta en la casita con todos
+- Three.js r160 (MIT) incluido en `gabby/three.module.min.js`. Los personajes (en `gabby/personajes.js`) son versiones propias modeladas con formas 3D, parecidas a las de la serie pero sin usar sus imágenes ni modelos, y la música es original, hecha con Web Audio
 
 ## Villa Rosquilla: Choca y Corre
 
