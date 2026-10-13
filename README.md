@@ -6,6 +6,7 @@ Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 
 | Juego | Carpeta | Qué es |
 | --- | --- | --- |
+| Villa Rosquilla: Choca y Corre | [`villarosquilla/`](villarosquilla/) | Ciudad de caricatura en 3D para recorrer a pie y en coche, con misiones y persecuciones de la policía |
 | Hello Kitty: El Jardín Mágico | [`hellokitty/`](hellokitty/) | Juego en 3D para niños pequeños con Hello Kitty, My Melody y Kuromi |
 | Toy Story: La Gran Aventura | [`toystory/`](toystory/) | Aventura en 3D para niños pequeños con Woody, Buzz y Jessie |
 | Godzilla: Choque de Titanes | [`godzilla/`](godzilla/) | Peleas de kaijus 2 contra 2 al estilo Marvel vs Capcom |
@@ -13,6 +14,19 @@ Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 | Godzilla Pac-Man | [`pacman/`](pacman/) | Pac-Man con Godzilla como protagonista y kaijus como enemigos |
 
 El `index.html` de la raíz es el índice. Para añadir un juego, crea su carpeta con un `index.html` y suma una entrada a la lista `GAMES` del índice.
+
+## Villa Rosquilla: Choca y Corre
+
+Juego de mundo abierto inspirado en los juegos de ciudad como *The Simpsons: Hit and Run*, pero con personajes, ciudad y música propios.
+
+- Elige a Papá Toño, Mamá Lupe, Beto o Lili y recorre Villa Rosquilla a pie o en cualquier coche (también los del tráfico)
+- **A pie:** WASD o flechas · Shift correr · Espacio saltar · F patada · E subir al coche o hablar
+- **En coche:** W acelerar · S frenar y reversa · A/D girar · Espacio freno de mano · H claxon · E bajar · R enderezar
+- Arrastra el ratón para girar la cámara · M música · Esc pausa · en el móvil aparecen palanca y botones
+- 6 misiones de historia (el ! amarillo marca quién te da la siguiente): entrega con tiempo, recoger piezas, embestir un camión, carrera contra Rayo Ramírez, cazar drones espía y una huida final con la policía
+- Medidor **Choca y Corre**: si chocas coches, atropellas cosas o empujas peatones se llena y llega la policía; si te atrapan pagas multa
+- Monedas por la ciudad, 20 cartas escondidas y cabinas de teléfono ☎ para pedir los coches que vas desbloqueando. El progreso se guarda en el navegador
+- Three.js r160 (MIT) incluido en `villarosquilla/three.module.min.js`. Personajes, coches y ciudad están hechos con formas 3D en `villarosquilla/modelos.js` (estilo caricatura con contorno negro) y la música es original, hecha con Web Audio
 
 ## Hello Kitty: El Jardín Mágico
 
