@@ -6,6 +6,7 @@ Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 
 | Juego | Carpeta | Qué es |
 | --- | --- | --- |
+| Paw Patrol: ¡Misión al Mar! | [`pawpatrol/`](pawpatrol/) | Juego en 3D para niños pequeños con Skye, Marshall y Zuma: casa, juguetes, playa y barco |
 | La Casita de Gabby: ¡Fiesta con los gatitos! | [`gabby/`](gabby/) | Juego en 3D para niños pequeños con Gabby y los gatitos: conos, corazones y hula hula |
 | Villa Rosquilla: Choca y Corre | [`villarosquilla/`](villarosquilla/) | Ciudad de caricatura en 3D para recorrer a pie y en coche, con misiones y persecuciones de la policía |
 | Hello Kitty: El Jardín Mágico | [`hellokitty/`](hellokitty/) | Juego en 3D para niños pequeños con Hello Kitty, My Melody y Kuromi |
@@ -15,6 +16,16 @@ Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 | Godzilla Pac-Man | [`pacman/`](pacman/) | Pac-Man con Godzilla como protagonista y kaijus como enemigos |
 
 El `index.html` de la raíz es el índice. Para añadir un juego, crea su carpeta con un `index.html` y suma una entrada a la lista `GAMES` del índice.
+
+## Paw Patrol: ¡Misión al Mar!
+
+Para niñas y niños de unos 5 años, con el mismo estilo que Gabby y Hello Kitty: no se puede perder y la voz del navegador lee cada misión y cuenta en español.
+
+- Elige a Skye, Marshall o Zuma; los otros dos cachorros te siguen en fila · **M** música · **B** ladrar · 🏠 vuelve al inicio
+- **Toca el suelo** (o haz clic) para caminar · **flechas** o **WASD** · **Espacio** o el botón rojo para saltar. Una flecha roja señala a dónde ir
+- Misiones: entrar a la casa por la puerta roja, llevar 6 juguetes al baúl azul (pelota, osito, camión de bomberos, avión, patito y cubos), salir por la puerta de atrás a la playa, caminar por el muelle y subirse al barco de Zuma
+- En el barco, toca la pantalla (o **Espacio**) para darle a cada cachorro pizza, helado, galletas de hueso, sandía, hot dog, dona y cupcake hasta 10; un delfín salta alrededor. Al final, fiesta en el barco
+- Three.js r160 (MIT) incluido en `pawpatrol/three.module.min.js`. Los cachorros (en `pawpatrol/personajes.js`) son versiones propias modeladas con formas 3D, parecidas a las de la serie pero sin usar sus imágenes ni modelos, y la música es una marcha original hecha con Web Audio
 
 ## La Casita de Gabby: ¡Fiesta con los gatitos!
 
