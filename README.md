@@ -6,6 +6,7 @@ Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 
 | Juego | Carpeta | Qué es |
 | --- | --- | --- |
+| La Sirenita: ¡Vengan, pececitos! | [`sirenita/`](sirenita/) | Juego en 3D para niños pequeños con Ariel y Flounder: pececitos, sus papás, el Príncipe Eric, la mochila y el barco |
 | Paw Patrol: ¡Misión al Mar! | [`pawpatrol/`](pawpatrol/) | Juego en 3D para niños pequeños con Skye, Marshall y Zuma: casa, juguetes, playa y barco |
 | La Casita de Gabby: ¡Fiesta con los gatitos! | [`gabby/`](gabby/) | Juego en 3D para niños pequeños con Gabby y los gatitos: conos, corazones y hula hula |
 | Villa Rosquilla: Choca y Corre | [`villarosquilla/`](villarosquilla/) | Ciudad de caricatura en 3D para recorrer a pie y en coche, con misiones y persecuciones de la policía |
@@ -16,6 +17,19 @@ Juega en línea: https://arkangeldigital-maker.github.io/pacman/
 | Godzilla Pac-Man | [`pacman/`](pacman/) | Pac-Man con Godzilla como protagonista y kaijus como enemigos |
 
 El `index.html` de la raíz es el índice. Para añadir un juego, crea su carpeta con un `index.html` y suma una entrada a la lista `GAMES` del índice.
+
+## La Sirenita: ¡Vengan, pececitos!
+
+Para niñas y niños de unos 5 años, con el mismo estilo que Paw Patrol y Gabby: no se puede perder y la voz del navegador lee cada misión y cuenta en español.
+
+- Juegas con Ariel; Flounder la sigue siempre · **M** música · 🏠 vuelve al inicio
+- **Toca el agua** (o haz clic) para nadar · **flechas** o **WASD**. Una flecha rosa señala a dónde ir
+- **Nivel 1, llama a los pececitos**: nada cerca de cada pececito y toca el botón **¡VENGAN!** (o **Espacio**, o toca al pececito); Ariel dice "¡Vengan, pececitos!" y te siguen en fila
+- **Nivel 2, busca a sus papás**: nada hasta Papá Naranja, Mamá Morada y Mamá Azul y diles ¡VENGAN!; cada pececito se pone detrás de su papá
+- **Nivel 3, el Príncipe Eric**: está en la playa; al llegar te saluda, salta al agua y nada con todos
+- **Nivel 4, la mochila**: Eric le da una mochila a Ariel; junta el tenedor, la concha, la corona, la manzana, la estrella de mar y el mapa del tesoro
+- **Nivel 5, al barco**: nada hasta la escalera del barco de Eric; Ariel y Eric suben, los peces nadan junto al barco y saltan como delfines mientras se van de paseo
+- Three.js r160 (MIT) incluido en `sirenita/three.module.min.js`. Los personajes (en `sirenita/personajes.js`) son versiones propias modeladas con formas 3D, parecidas a las de la película pero sin usar sus imágenes ni modelos, y la música es un calipso original hecho con Web Audio
 
 ## Paw Patrol: ¡Misión al Mar!
 
